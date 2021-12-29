@@ -4,6 +4,7 @@ import logging
 
 from peewee import BigIntegerField, CharField, IntegerField, Model, SqliteDatabase
 from random import random, randint
+from datetime import datetime, timedelta
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ForceReply
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, Filters, CallbackContext
@@ -151,12 +152,9 @@ def start(update: Update, context: CallbackContext) -> None:
     _user = update.effective_user
     user, created = get_or_create_user(_user.id)
 
-    if created:
-        user.first_name = _user.first_name
-        user.save()
-        update.message.reply_text("Welcome, {}!".format(user.first_name))
-    else:
-        update.message.reply_text("Welcome back, {}!".format(user.first_name))
+    user.first_name = _user.first_name
+    user.save()
+    update.message.reply_text("Welcome, {}!".format(user.first_name))
 
     update.message.reply_text("== Placeholder for the tutorial ==")
 
@@ -174,6 +172,8 @@ def start(update: Update, context: CallbackContext) -> None:
         pass
 
     context.bot.pin_chat_message(update.message.chat.id, counter.message_id)
+
+    update_job(_user.id, context)
 
 
 def help(update: Update, context: CallbackContext) -> None:
@@ -375,6 +375,53 @@ def answer(update: Update, context: CallbackContext) -> None:
     pinned_and_achievements(user.id, context)
 
 
+def update_from_job(context: CallbackContext) -> None:
+    id = context.job.context
+    user, _ = get_or_create_user(id)
+    stats = get_stats(id)
+
+    messages_to_add = 0
+    contacts_to_add = 0
+
+    if stats["contacts"]["unlocked"]:
+        messages_to_add += 0.02 * stats["contacts"]["quantity"]
+        contacts_to_add += 0.00001 * stats["contacts"]["quantity"]
+    if stats["groups"]["unlocked"]:
+        messages_to_add += 0.2 * stats["groups"]["quantity"]
+        contacts_to_add += 0.0001 * stats["groups"]["quantity"]
+    if stats["channels"]["unlocked"]:
+        messages_to_add += 2 * stats["channels"]["quantity"]
+        contacts_to_add += 0.001 * stats["channels"]["quantity"]
+    if stats["supergroups"]["unlocked"]:
+        messages_to_add += 20 * stats["supergroups"]["quantity"]
+        contacts_to_add += 0.01 * stats["supergroups"]["quantity"]
+
+    user.messages += int(messages_to_add)
+    user.messages_total += int(messages_to_add)
+    user.contacts += int(contacts_to_add)
+    user.contacts_total += int(contacts_to_add)
+    user.save()
+
+    pinned_and_achievements(id, context)
+
+
+def remove_job_if_exists(name: str, context: CallbackContext) -> bool:
+    current_jobs = context.job_queue.get_jobs_by_name(name)
+    if not current_jobs:
+        return False
+    for job in current_jobs:
+        job.schedule_removal()
+    return True
+
+
+def update_job(id: int, context: CallbackContext) -> None:
+    try:
+        remove_job_if_exists(str(id), context)
+        context.job_queue.run_repeating(update_from_job, 10, context=id, name=str(id))
+    except (IndexError, ValueError):
+        pass
+
+
 def main() -> None:
     # Create the Updater and pass it your bot's token.
     updater = Updater(BOT_TOKEN)
@@ -392,6 +439,8 @@ def main() -> None:
     # on non command i.e message - echo the message on Telegram
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, answer))
 
+    # Jobs go here
+
     # Start the Bot
     updater.start_polling()
 
@@ -399,6 +448,9 @@ def main() -> None:
     # SIGTERM or SIGABRT. This should be used most of the time, since
     # start_polling() is non-blocking and will stop the bot gracefully.
     updater.idle()
+
+    # Job
+    updater.job_queue.run_once(alarm, 15, context="59804991", name=str(3))
 
 
 if __name__ == '__main__':
