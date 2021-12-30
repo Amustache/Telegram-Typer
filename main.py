@@ -22,7 +22,8 @@ logger = logging.getLogger(__name__)
 # Database
 main_db = SqliteDatabase("./main.db")
 
-resale_percentage = 0.77
+RESALE_PERCENTAGE = 0.77
+TIME_INTERVAL = 5
 
 
 class Players(Model):
@@ -77,6 +78,7 @@ def get_stats(id: int):
             "unlock_at": {"messages": 10},
             "unlocked": user.contacts_state,
             "price": {"messages": 10},
+            "gain": {"messages": 0.02, "contacts": 0.00001},
             "quantity": user.contacts,
             "total": user.contacts_total,
         },
@@ -84,6 +86,7 @@ def get_stats(id: int):
             "unlock_at": {"messages": 100, "contacts": 4},
             "unlocked": user.groups_state,
             "price": {"messages": 100, "contacts": 4},
+            "gain": {"messages": 0.2, "contacts": 0.0001},
             "quantity": user.groups,
             "total": user.groups_total,
         },
@@ -91,6 +94,7 @@ def get_stats(id: int):
             "unlock_at": {"messages": 1000, "contacts": 16},
             "unlocked": user.channels_state,
             "price": {"messages": 1000, "contacts": 16},
+            "gain": {"messages": 2, "contacts": 0.001},
             "quantity": user.channels,
             "total": user.channels_total,
         },
@@ -98,6 +102,7 @@ def get_stats(id: int):
             "unlock_at": {"messages": 10000, "contacts": 256, "groups": 1},
             "unlocked": user.supergroups_state,
             "price": {"messages": 10000, "contacts": 256, "groups": 1},
+            "gain": {"messages": 20, "contacts": 0.01},
             "quantity": user.supergroups,
             "total": user.supergroups_total,
         },
@@ -123,7 +128,7 @@ def update_pinned_message(id: int, context: CallbackContext):
         return
 
 
-def check_achievements(id: int, context: CallbackContext):
+def check_unlocks(id: int, context: CallbackContext):
     user, _ = get_or_create_user(id)
     stats = get_stats(id)
 
@@ -131,7 +136,7 @@ def check_achievements(id: int, context: CallbackContext):
         if "unlock_at" in attrs and not stats[item]["unlocked"]:
             unlock = True
             for unlock_item, unlock_quantity in attrs["unlock_at"].items():  # e.g., "messages": 10
-                if stats[unlock_item]["quantity"] < unlock_quantity:
+                if stats[unlock_item]["total"] < unlock_quantity:
                     unlock = False
                     break
             if unlock:
@@ -145,7 +150,7 @@ def pinned_and_achievements(id: int, context: CallbackContext):
     Because I'm lazy.
     """
     update_pinned_message(id, context)
-    check_achievements(id, context)
+    check_unlocks(id, context)
 
 
 def start(update: Update, context: CallbackContext) -> None:
@@ -192,7 +197,7 @@ def interface(update: Update, context: CallbackContext) -> None:
 
         if data[0] == "c":
             buy_price = stats["contacts"]["price"]["messages"]
-            sell_price = int(buy_price * resale_percentage)
+            sell_price = int(buy_price * RESALE_PERCENTAGE)
 
             if data[1] == "b":  # Buy
                 if data[2:] == "1":
@@ -247,7 +252,7 @@ def interface(update: Update, context: CallbackContext) -> None:
 
         elif data[0] == "g":
             buy_price = stats["groups"]["price"]
-            sell_price = {k: int(v * resale_percentage) for k, v in buy_price.items()}
+            sell_price = {k: int(v * RESALE_PERCENTAGE) for k, v in buy_price.items()}
 
             if data[1] == "b":  # Buy
                 if data[2:] == "1":
@@ -263,7 +268,7 @@ def interface(update: Update, context: CallbackContext) -> None:
                     user.groups += 10
                     user.groups_total += 10
                 else:
-                    qt = min(user.messages // buy_price["messages"], user.messages // buy_price["contacts"])
+                    qt = min(user.messages // buy_price["messages"], user.contacts // buy_price["contacts"])
                     user.messages -= buy_price["messages"] * qt
                     user.contacts -= buy_price["contacts"] * qt
 
@@ -304,9 +309,11 @@ def interface(update: Update, context: CallbackContext) -> None:
 
             # Select
             buy = []
-            if stats["messages"]["quantity"] >= buy_price["messages"] and stats["contacts"]["quantity"] >= buy_price["contacts"]:
+            if stats["messages"]["quantity"] >= buy_price["messages"] and stats["contacts"]["quantity"] >= buy_price[
+                "contacts"]:
                 buy.append(InlineKeyboardButton("Join 1 Group", callback_data="gb1"))
-                if stats["messages"]["quantity"] >= 10 * buy_price["messages"] and stats["contacts"]["quantity"] >= 10 * buy_price["contacts"]:
+                if stats["messages"]["quantity"] >= 10 * buy_price["messages"] and stats["contacts"]["quantity"] >= 10 * \
+                        buy_price["contacts"]:
                     buy.append(InlineKeyboardButton("Join 10 Groups", callback_data="gb10"))
                 buy.append(InlineKeyboardButton("Join Max Groups", callback_data="gbmax"))
 
@@ -318,9 +325,164 @@ def interface(update: Update, context: CallbackContext) -> None:
                 sell.append(InlineKeyboardButton("Leave All Groups", callback_data="gsmax"))
 
         elif data[0] == "h":
-            pass
+            buy_price = stats["channels"]["price"]
+            sell_price = {k: int(v * RESALE_PERCENTAGE) for k, v in buy_price.items()}
+
+            if data[1] == "b":  # Buy
+                if data[2:] == "1":
+                    user.messages -= buy_price["messages"]
+                    user.contacts -= buy_price["contacts"]
+
+                    user.channels += 1
+                    user.channels_total += 1
+                elif data[2:] == "10":
+                    user.messages -= 10 * buy_price["messages"]
+                    user.contacts -= 10 * buy_price["contacts"]
+
+                    user.channels += 10
+                    user.channels_total += 10
+                else:
+                    qt = min(user.messages // buy_price["messages"], user.contacts // buy_price["contacts"])
+                    user.messages -= buy_price["messages"] * qt
+                    user.contacts -= buy_price["contacts"] * qt
+
+                    user.channels += qt
+                    user.channels_total += qt
+                user.save()
+                stats = get_stats(_user.id)
+            elif data[1] == "s":  # Sell
+                if data[2:] == "1":
+                    user.messages += sell_price["messages"]
+                    user.messages_total += sell_price["messages"]
+                    user.contacts += sell_price["contacts"]
+                    user.contacts_total += sell_price["contacts"]
+
+                    user.channels -= 1
+                elif data[2:] == "10":
+                    user.messages -= 10 * sell_price["messages"]
+                    user.messages_total += 10 * sell_price["messages"]
+                    user.contacts -= 10 * sell_price["contacts"]
+                    user.contacts_total += 10 * sell_price["contacts"]
+
+                    user.channels -= 10
+                else:
+                    qt_messages = user.channels * sell_price["messages"]
+                    user.messages += qt_messages
+                    user.messages_total += qt_messages
+                    qt_contacts = user.channels * sell_price["contacts"]
+                    user.contacts += qt_contacts
+                    user.contacts_total += qt_contacts
+
+                    user.channels -= user.channels
+                user.save()
+                stats = get_stats(_user.id)
+
+            message = "**Channels**\nYou have {} Channels.\nJoin: -{} messages, -{} contacts.\nLeave: +{} messages, " \
+                      "+{} contacts.".format(stats["channels"]["quantity"], buy_price["messages"], buy_price["contacts"],
+                                             sell_price["messages"], sell_price["contacts"])
+
+            # Select
+            buy = []
+            if stats["messages"]["quantity"] >= buy_price["messages"] and stats["contacts"]["quantity"] >= buy_price[
+                "contacts"]:
+                buy.append(InlineKeyboardButton("Join 1 Channel", callback_data="hb1"))
+                if stats["messages"]["quantity"] >= 10 * buy_price["messages"] and stats["contacts"]["quantity"] >= 10 * \
+                        buy_price["contacts"]:
+                    buy.append(InlineKeyboardButton("Join 10 Channels", callback_data="hb10"))
+                buy.append(InlineKeyboardButton("Join Max Channels", callback_data="hbmax"))
+
+            sell = []
+            if stats["channels"]["quantity"] >= 1:
+                sell.append(InlineKeyboardButton("Leave 1 Channel", callback_data="hs1"))
+                if stats["channels"]["quantity"] >= 10:
+                    sell.append(InlineKeyboardButton("Leave 10 Channels", callback_data="hs10"))
+                sell.append(InlineKeyboardButton("Leave All Channels", callback_data="hsmax"))
+
         elif data[0] == "s":
-            pass
+            buy_price = stats["supergroups"]["price"]
+            sell_price = {k: int(v * RESALE_PERCENTAGE) for k, v in buy_price.items()}
+
+            if data[1] == "b":  # Buy
+                if data[2:] == "1":
+                    user.messages -= buy_price["messages"]
+                    user.contacts -= buy_price["contacts"]
+                    user.groups -= buy_price["groups"]
+
+                    user.supergroups += 1
+                    user.supergroups_total += 1
+                elif data[2:] == "10":
+                    user.messages -= 10 * buy_price["messages"]
+                    user.contacts -= 10 * buy_price["contacts"]
+                    user.groups -= 10 * buy_price["groups"]
+
+                    user.supergroups += 10
+                    user.supergroups_total += 10
+                else:
+                    qt = min(user.messages // buy_price["messages"], user.contacts // buy_price["contacts"], user.groups // buy_price["groups"])
+                    user.messages -= buy_price["messages"] * qt
+                    user.contacts -= buy_price["contacts"] * qt
+                    user.groups -= buy_price["groups"] * qt
+
+                    user.supergroups += qt
+                    user.supergroups_total += qt
+                user.save()
+                stats = get_stats(_user.id)
+            elif data[1] == "s":  # Sell
+                if data[2:] == "1":
+                    user.messages += sell_price["messages"]
+                    user.messages_total += sell_price["messages"]
+                    user.contacts += sell_price["contacts"]
+                    user.contacts_total += sell_price["contacts"]
+                    user.groups += sell_price["groups"]
+                    user.groups_total += sell_price["groups"]
+
+                    user.supergroups -= 1
+                elif data[2:] == "10":
+                    user.messages -= 10 * sell_price["messages"]
+                    user.messages_total += 10 * sell_price["messages"]
+                    user.contacts -= 10 * sell_price["contacts"]
+                    user.contacts_total += 10 * sell_price["contacts"]
+                    user.groups -= 10 * sell_price["groups"]
+                    user.groups_total += 10 * sell_price["groups"]
+
+                    user.supergroups -= 10
+                else:
+                    qt_messages = user.supergroups * sell_price["messages"]
+                    user.messages += qt_messages
+                    user.messages_total += qt_messages
+                    qt_contacts = user.supergroups * sell_price["contacts"]
+                    user.contacts += qt_contacts
+                    user.contacts_total += qt_contacts
+                    qt_groups = user.supergroups * sell_price["groups"]
+                    user.groups += qt_groups
+                    user.groups_total += qt_groups
+
+                    user.supergroups -= user.supergroups
+                user.save()
+                stats = get_stats(_user.id)
+
+            message = "**Supergroups**\nYou have {} Supergroups.\nJoin: -{} messages, -{} contacts, -{} groups.\nLeave: +{} messages, " \
+                      "+{} contacts, +{} groups.".format(stats["supergroups"]["quantity"], buy_price["messages"], buy_price["contacts"], buy_price["groups"],
+                                             sell_price["messages"], sell_price["contacts"], sell_price["groups"])
+
+            # Select
+            buy = []
+            if stats["messages"]["quantity"] >= buy_price["messages"] and stats["contacts"]["quantity"] >= buy_price[
+                "contacts"] and stats["groups"]["quantity"] >= buy_price[
+                "groups"]:
+                buy.append(InlineKeyboardButton("Join 1 Supergroup", callback_data="hb1"))
+                if stats["messages"]["quantity"] >= 10 * buy_price["messages"] and stats["contacts"]["quantity"] >= 10 * \
+                        buy_price["contacts"] and stats["groups"]["quantity"] >= 10 * \
+                        buy_price["groups"]:
+                    buy.append(InlineKeyboardButton("Join 10 Supergroups", callback_data="hb10"))
+                buy.append(InlineKeyboardButton("Join Max Supergroups", callback_data="hbmax"))
+
+            sell = []
+            if stats["supergroups"]["quantity"] >= 1:
+                sell.append(InlineKeyboardButton("Leave 1 Supergroup", callback_data="hs1"))
+                if stats["supergroups"]["quantity"] >= 10:
+                    sell.append(InlineKeyboardButton("Leave 10 Supergroups", callback_data="hs10"))
+                sell.append(InlineKeyboardButton("Leave All Supergroups", callback_data="hsmax"))
         else:
             raise ValueError("Invalid argument: {}.".format(data))
 
@@ -384,22 +546,22 @@ def update_from_job(context: CallbackContext) -> None:
     contacts_to_add = 0
 
     if stats["contacts"]["unlocked"]:
-        messages_to_add += 0.02 * stats["contacts"]["quantity"]
-        contacts_to_add += 0.00001 * stats["contacts"]["quantity"]
+        messages_to_add += stats["contacts"]["gain"]["messages"] * stats["contacts"]["quantity"]
+        contacts_to_add += stats["contacts"]["gain"]["contacts"] * stats["contacts"]["quantity"]
     if stats["groups"]["unlocked"]:
-        messages_to_add += 0.2 * stats["groups"]["quantity"]
-        contacts_to_add += 0.0001 * stats["groups"]["quantity"]
+        messages_to_add += stats["groups"]["gain"]["messages"] * stats["groups"]["quantity"]
+        contacts_to_add += stats["groups"]["gain"]["contacts"] * stats["groups"]["quantity"]
     if stats["channels"]["unlocked"]:
-        messages_to_add += 2 * stats["channels"]["quantity"]
-        contacts_to_add += 0.001 * stats["channels"]["quantity"]
+        messages_to_add += stats["channels"]["gain"]["messages"] * stats["channels"]["quantity"]
+        contacts_to_add += stats["channels"]["gain"]["contacts"] * stats["channels"]["quantity"]
     if stats["supergroups"]["unlocked"]:
-        messages_to_add += 20 * stats["supergroups"]["quantity"]
-        contacts_to_add += 0.01 * stats["supergroups"]["quantity"]
+        messages_to_add += stats["supergroups"]["gain"]["messages"] * stats["supergroups"]["quantity"]
+        contacts_to_add += stats["supergroups"]["gain"]["contacts"] * stats["supergroups"]["quantity"]
 
-    user.messages += int(messages_to_add)
-    user.messages_total += int(messages_to_add)
-    user.contacts += int(contacts_to_add)
-    user.contacts_total += int(contacts_to_add)
+    user.messages += TIME_INTERVAL * int(messages_to_add)
+    user.messages_total += TIME_INTERVAL * int(messages_to_add)
+    user.contacts += TIME_INTERVAL * int(contacts_to_add)
+    user.contacts_total += TIME_INTERVAL * int(contacts_to_add)
     user.save()
 
     pinned_and_achievements(id, context)
@@ -417,7 +579,7 @@ def remove_job_if_exists(name: str, context: CallbackContext) -> bool:
 def update_job(id: int, context: CallbackContext) -> None:
     try:
         remove_job_if_exists(str(id), context)
-        context.job_queue.run_repeating(update_from_job, 10, context=id, name=str(id))
+        context.job_queue.run_repeating(update_from_job, TIME_INTERVAL, context=id, name=str(id))
     except (IndexError, ValueError):
         pass
 
