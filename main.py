@@ -2,11 +2,13 @@
 # pylint: disable=C0116,W0613
 import logging
 
-from peewee import BigIntegerField, CharField, IntegerField, Model, SqliteDatabase
+from peewee import BigIntegerField, CharField, FloatField, IntegerField, Model, SqliteDatabase
 from random import random, randint
 from datetime import datetime, timedelta
+from functools import wraps
+from time import sleep
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ForceReply
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ForceReply, ChatAction
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, Filters, CallbackContext
 from telegram.error import BadRequest
 
@@ -23,7 +25,7 @@ logger = logging.getLogger(__name__)
 main_db = SqliteDatabase("./main.db")
 
 RESALE_PERCENTAGE = 0.77
-TIME_INTERVAL = 5
+TIME_INTERVAL = 1
 
 
 class Players(Model):
@@ -33,24 +35,24 @@ class Players(Model):
     pinned_message = BigIntegerField(null=True)
 
     # Stats
-    messages = BigIntegerField(default=0)
-    messages_total = BigIntegerField(default=0)
+    messages = FloatField(default=0)
+    messages_total = FloatField(default=0)
 
-    contacts = BigIntegerField(default=0)
+    contacts = FloatField(default=0)
     contacts_state = IntegerField(default=0)
-    contacts_total = BigIntegerField(default=0)
+    contacts_total = FloatField(default=0)
 
-    groups = BigIntegerField(default=0)
+    groups = FloatField(default=0)
     groups_state = IntegerField(default=0)
-    groups_total = BigIntegerField(default=0)
+    groups_total = FloatField(default=0)
 
-    channels = BigIntegerField(default=0)
+    channels = FloatField(default=0)
     channels_state = IntegerField(default=0)
-    channels_total = BigIntegerField(default=0)
+    channels_total = FloatField(default=0)
 
-    supergroups = BigIntegerField(default=0)
+    supergroups = FloatField(default=0)
     supergroups_state = IntegerField(default=0)
-    supergroups_total = BigIntegerField(default=0)
+    supergroups_total = FloatField(default=0)
 
     class Meta:
         database = main_db
@@ -58,6 +60,36 @@ class Players(Model):
 
 main_db.connect()
 main_db.create_tables([Players])
+
+
+def get_si(number, type="'", size=3):
+    if number < 1:
+        return "0"
+    if type == "s":
+        suf = {
+            0: "",
+            1: " k",
+            2: " M",
+            3: " G",
+            4: " T",
+            5: " P",
+            6: " E",
+            7: " Z",
+            8: " Y",
+            9: " A",
+            10: " AA",
+            11: " AAA",
+            12: " stop",
+        }
+        exp = 0
+        while number // 10 ** (exp * size):
+            exp += 1
+        exp -= 1
+        return "{:.2f}".format(int(number / 10 ** (exp * size))).rstrip('0').rstrip('.') + "{}".format(suf[exp])
+    elif type == "'":
+        return "{:,}".format(int(number)).replace(",", "'")
+    else:
+        return number
 
 
 def get_or_create_user(id: int):
@@ -112,15 +144,15 @@ def get_stats(id: int):
 def update_pinned_message(id: int, context: CallbackContext):
     user, _ = get_or_create_user(id)
 
-    message = "– Messages: {}".format(user.messages)
+    message = "– 💬 Messages: {}".format(get_si(user.messages))
     if user.contacts_state:
-        message += "\n– Contacts: {}".format(user.contacts)
+        message += "\n– 📇 Contacts: {}".format(get_si(user.contacts))
     if user.groups_state:
-        message += "\n– Groups: {}".format(user.groups)
+        message += "\n– 👥 Groups: {}".format(get_si(user.groups))
     if user.channels_state:
-        message += "\n– Channels: {}".format(user.channels)
+        message += "\n– 📰 Channels: {}".format(get_si(user.channels))
     if user.supergroups_state:
-        message += "\n– Supergroups: {}".format(user.supergroups)
+        message += "\n– 👥 Supergroups: {}".format(get_si(user.supergroups))
 
     try:
         context.bot.edit_message_text(message, user.id, user.pinned_message)
@@ -142,7 +174,7 @@ def check_unlocks(id: int, context: CallbackContext):
             if unlock:
                 exec("user.{}_state = 1".format(item))  # Worst thing I ever wrote probably, sorry not sorry.
                 user.save()
-                context.bot.send_message(user.id, "Unlocked {}!".format(item))
+                context.bot.send_message(user.id, "🏅 Unlocked {}!".format(item))
 
 
 def pinned_and_achievements(id: int, context: CallbackContext):
@@ -195,6 +227,7 @@ def interface(update: Update, context: CallbackContext) -> None:
         query.answer()
         data = query.data
 
+        # _C_ontacts
         if data[0] == "c":
             buy_price = stats["contacts"]["price"]["messages"]
             sell_price = int(buy_price * RESALE_PERCENTAGE)
@@ -232,8 +265,11 @@ def interface(update: Update, context: CallbackContext) -> None:
                 user.save()
                 stats = get_stats(_user.id)
 
-            message = "**Contacts**\nYou have {} Contacts.\nFind: -{} messages.\nForfeit: +{} messages.".format(
-                stats["contacts"]["quantity"], buy_price, sell_price)
+            message = "**Contacts**\n" \
+                      "You have {} Contacts.\n" \
+                      "Find: -{} messages.\n" \
+                      "Forfeit: +{} messages.".format(
+                get_si(stats["contacts"]["quantity"]), get_si(buy_price), get_si(sell_price))
 
             # Select
             buy = []
@@ -250,6 +286,7 @@ def interface(update: Update, context: CallbackContext) -> None:
                     sell.append(InlineKeyboardButton("Forfeit 10 Contacts", callback_data="cs10"))
                 sell.append(InlineKeyboardButton("Forfeit All Contacts", callback_data="csmax"))
 
+        # _G_roups
         elif data[0] == "g":
             buy_price = stats["groups"]["price"]
             sell_price = {k: int(v * RESALE_PERCENTAGE) for k, v in buy_price.items()}
@@ -303,9 +340,12 @@ def interface(update: Update, context: CallbackContext) -> None:
                 user.save()
                 stats = get_stats(_user.id)
 
-            message = "**Groups**\nYou have {} Groups.\nJoin: -{} messages, -{} contacts.\nLeave: +{} messages, " \
-                      "+{} contacts.".format(stats["groups"]["quantity"], buy_price["messages"], buy_price["contacts"],
-                                             sell_price["messages"], sell_price["contacts"])
+            message = "**Groups**\n" \
+                      "You have {} Groups.\n" \
+                      "Join: -{} messages, -{} contacts.\n" \
+                      "Leave: +{} messages, +{} contacts.".format(get_si(stats["groups"]["quantity"]),
+                                                                  get_si(buy_price["messages"]), get_si(buy_price["contacts"]),
+                                                                  get_si(sell_price["messages"]), get_si(sell_price["contacts"]))
 
             # Select
             buy = []
@@ -324,6 +364,7 @@ def interface(update: Update, context: CallbackContext) -> None:
                     sell.append(InlineKeyboardButton("Leave 10 Groups", callback_data="gs10"))
                 sell.append(InlineKeyboardButton("Leave All Groups", callback_data="gsmax"))
 
+        # C_h_annels
         elif data[0] == "h":
             buy_price = stats["channels"]["price"]
             sell_price = {k: int(v * RESALE_PERCENTAGE) for k, v in buy_price.items()}
@@ -377,9 +418,13 @@ def interface(update: Update, context: CallbackContext) -> None:
                 user.save()
                 stats = get_stats(_user.id)
 
-            message = "**Channels**\nYou have {} Channels.\nJoin: -{} messages, -{} contacts.\nLeave: +{} messages, " \
-                      "+{} contacts.".format(stats["channels"]["quantity"], buy_price["messages"], buy_price["contacts"],
-                                             sell_price["messages"], sell_price["contacts"])
+            message = "**Channels**\n" \
+                      "You have {} Channels.\n" \
+                      "Join: -{} messages, -{} contacts.\n" \
+                      "Leave: +{} messages, +{} contacts.".format(get_si(stats["channels"]["quantity"]),
+                                                                  get_si(buy_price["messages"]),
+                                                                  get_si(buy_price["contacts"]),
+                                                                  get_si(sell_price["messages"]), get_si(sell_price["contacts"]))
 
             # Select
             buy = []
@@ -398,6 +443,7 @@ def interface(update: Update, context: CallbackContext) -> None:
                     sell.append(InlineKeyboardButton("Leave 10 Channels", callback_data="hs10"))
                 sell.append(InlineKeyboardButton("Leave All Channels", callback_data="hsmax"))
 
+        # _S_upergroups
         elif data[0] == "s":
             buy_price = stats["supergroups"]["price"]
             sell_price = {k: int(v * RESALE_PERCENTAGE) for k, v in buy_price.items()}
@@ -418,7 +464,8 @@ def interface(update: Update, context: CallbackContext) -> None:
                     user.supergroups += 10
                     user.supergroups_total += 10
                 else:
-                    qt = min(user.messages // buy_price["messages"], user.contacts // buy_price["contacts"], user.groups // buy_price["groups"])
+                    qt = min(user.messages // buy_price["messages"], user.contacts // buy_price["contacts"],
+                             user.groups // buy_price["groups"])
                     user.messages -= buy_price["messages"] * qt
                     user.contacts -= buy_price["contacts"] * qt
                     user.groups -= buy_price["groups"] * qt
@@ -461,28 +508,35 @@ def interface(update: Update, context: CallbackContext) -> None:
                 user.save()
                 stats = get_stats(_user.id)
 
-            message = "**Supergroups**\nYou have {} Supergroups.\nJoin: -{} messages, -{} contacts, -{} groups.\nLeave: +{} messages, " \
-                      "+{} contacts, +{} groups.".format(stats["supergroups"]["quantity"], buy_price["messages"], buy_price["contacts"], buy_price["groups"],
-                                             sell_price["messages"], sell_price["contacts"], sell_price["groups"])
+            message = "**Supergroups**\n" \
+                      "You have {} Supergroups.\n" \
+                      "Join: -{} messages, -{} contacts, -{} groups.\n" \
+                      "Leave: +{} messages, +{} contacts, +{} groups.".format(get_si(stats["supergroups"]["quantity"]),
+                                                                              get_si(buy_price["messages"]),
+                                                                              get_si(buy_price["contacts"]),
+                                                                              get_si(buy_price["groups"]),
+                                                                              get_si(sell_price["messages"]),
+                                                                              get_si(sell_price["contacts"]),
+                                                                              get_si(sell_price["groups"]))
 
             # Select
             buy = []
             if stats["messages"]["quantity"] >= buy_price["messages"] and stats["contacts"]["quantity"] >= buy_price[
                 "contacts"] and stats["groups"]["quantity"] >= buy_price[
                 "groups"]:
-                buy.append(InlineKeyboardButton("Join 1 Supergroup", callback_data="hb1"))
+                buy.append(InlineKeyboardButton("Join 1 Supergroup", callback_data="sb1"))
                 if stats["messages"]["quantity"] >= 10 * buy_price["messages"] and stats["contacts"]["quantity"] >= 10 * \
                         buy_price["contacts"] and stats["groups"]["quantity"] >= 10 * \
                         buy_price["groups"]:
-                    buy.append(InlineKeyboardButton("Join 10 Supergroups", callback_data="hb10"))
-                buy.append(InlineKeyboardButton("Join Max Supergroups", callback_data="hbmax"))
+                    buy.append(InlineKeyboardButton("Join 10 Supergroups", callback_data="sb10"))
+                buy.append(InlineKeyboardButton("Join Max Supergroups", callback_data="sbmax"))
 
             sell = []
             if stats["supergroups"]["quantity"] >= 1:
-                sell.append(InlineKeyboardButton("Leave 1 Supergroup", callback_data="hs1"))
+                sell.append(InlineKeyboardButton("Leave 1 Supergroup", callback_data="ss1"))
                 if stats["supergroups"]["quantity"] >= 10:
-                    sell.append(InlineKeyboardButton("Leave 10 Supergroups", callback_data="hs10"))
-                sell.append(InlineKeyboardButton("Leave All Supergroups", callback_data="hsmax"))
+                    sell.append(InlineKeyboardButton("Leave 10 Supergroups", callback_data="ss10"))
+                sell.append(InlineKeyboardButton("Leave All Supergroups", callback_data="ssmax"))
         else:
             raise ValueError("Invalid argument: {}.".format(data))
 
@@ -506,7 +560,8 @@ def interface(update: Update, context: CallbackContext) -> None:
             choices.append(InlineKeyboardButton("Supergroups", callback_data="sx"))
 
         if choices:
-            message = "**Interface**\nSelect what you would like to bargain:"
+            message = "**Interface**\n" \
+                      "Select what you would like to bargain:"
             reply_markup = InlineKeyboardMarkup([choices])
         else:
             message = "You don't have enough messages for now..."
@@ -525,7 +580,21 @@ def stop(update: Update, context: CallbackContext) -> None:
     update.message.reply_text('Stop!')
 
 
+def send_typing_action(func):
+    """Sends typing action while processing func command."""
+
+    @wraps(func)
+    def command_func(update, context, *args, **kwargs):
+        context.bot.send_chat_action(chat_id=update.effective_message.chat_id, action=ChatAction.TYPING)
+        sleep(len(update.effective_message.text) // 10)  # This is based on my max WPM hehe.
+        return func(update, context,  *args, **kwargs)
+
+    return command_func
+
+
+@send_typing_action
 def answer(update: Update, context: CallbackContext) -> None:
+    context.bot.send_chat_action(chat_id=update.message.chat.id, action=ChatAction.TYPING)
     update.message.reply_text(update.message.text)
 
     _user = update.effective_user
@@ -558,10 +627,10 @@ def update_from_job(context: CallbackContext) -> None:
         messages_to_add += stats["supergroups"]["gain"]["messages"] * stats["supergroups"]["quantity"]
         contacts_to_add += stats["supergroups"]["gain"]["contacts"] * stats["supergroups"]["quantity"]
 
-    user.messages += TIME_INTERVAL * int(messages_to_add)
-    user.messages_total += TIME_INTERVAL * int(messages_to_add)
-    user.contacts += TIME_INTERVAL * int(contacts_to_add)
-    user.contacts_total += TIME_INTERVAL * int(contacts_to_add)
+    user.messages += TIME_INTERVAL * messages_to_add
+    user.messages_total += TIME_INTERVAL * messages_to_add
+    user.contacts += TIME_INTERVAL * contacts_to_add
+    user.contacts_total += TIME_INTERVAL * contacts_to_add
     user.save()
 
     pinned_and_achievements(id, context)
