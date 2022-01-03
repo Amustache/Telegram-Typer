@@ -116,6 +116,25 @@ def get_stats(id: int):
     }
 
 
+def see_stats(update: Update, context: CallbackContext) -> None:
+    stats = get_stats(update.effective_user.id)
+    message = "*📊 Stats 📊*\n\n"
+
+    message += "*{}*\n".format("messages")
+    message += "Current {}: {}\n".format("messages", get_si(stats["messages"]["quantity"]))
+    message += "Total {}: {}\n".format("messages", get_si(stats["messages"]["total"]))
+    message += "\n"
+
+    for item, attrs in stats.items():  # e.g., "contacts": {"unlock_at", ...}
+        if "unlock_at" in attrs and stats[item]["unlocked"]:
+            message += "*{}*\n".format(item)
+            message += "Current {}: {}\n".format(item, get_si(attrs["quantity"]))
+            message += "Total {}: {}\n".format(item, get_si(attrs["total"]))
+            message += "\n"
+
+    update.message.reply_text(message, parse_mode='MarkdownV2')
+
+
 def start(update: Update, context: CallbackContext) -> None:
     _user = update.effective_user
     user, created = get_or_create_user(_user.id)
@@ -197,10 +216,10 @@ def interface(update: Update, context: CallbackContext) -> None:
 
                     message = "*🧮 Interface 🧮*\n\n*{}*\n".format(item)
                     message += "- You have {} {}.\n".format(get_si(stats[item]["quantity"]), item)
-                    message += "- Join:"
+                    message += "📈 Join:"
                     for currency, quantity in buy_price.items():
                         message += " -{} {} ".format(quantity, currency)
-                    message += "- Leave:"
+                    message += "📉 Leave:"
                     for currency, quantity in sell_price.items():
                         message += " +{} {} ".format(quantity, currency)
 
@@ -210,17 +229,17 @@ def interface(update: Update, context: CallbackContext) -> None:
                     for currency, quantity in buy_price.items():
                         can_buy = min(can_buy, stats[currency]["quantity"] // quantity)
                     if can_buy >= 1:
-                        buy.append(InlineKeyboardButton("Join 1 {}".format(item), callback_data="{}b1".format(attrs["id"])))
+                        buy.append(InlineKeyboardButton("📈 Join 1 {}".format(item), callback_data="{}b1".format(attrs["id"])))
                         if can_buy >= 10:
-                            buy.append(InlineKeyboardButton("Join 10 {}".format(item), callback_data="{}b10".format(attrs["id"])))
-                        buy.append(InlineKeyboardButton("Join Max {}".format(item), callback_data="{}bmax".format(attrs["id"])))
+                            buy.append(InlineKeyboardButton("📈 Join 10 {}".format(item), callback_data="{}b10".format(attrs["id"])))
+                        buy.append(InlineKeyboardButton("📈 Join Max {}".format(item), callback_data="{}bmax".format(attrs["id"])))
 
                     sell = []
                     if stats[item]["quantity"] >= 1:
-                        sell.append(InlineKeyboardButton("Leave 1 {}".format(item), callback_data="{}s1".format(attrs["id"])))
+                        sell.append(InlineKeyboardButton("📉 Leave 1 {}".format(item), callback_data="{}s1".format(attrs["id"])))
                         if stats[item]["quantity"] >= 10:
-                            sell.append(InlineKeyboardButton("Leave 10 {}".format(item), callback_data="{}s10".format(attrs["id"])))
-                        sell.append(InlineKeyboardButton("Leave All {}".format(item), callback_data="{}smax".format(attrs["id"])))
+                            sell.append(InlineKeyboardButton("📉 Leave 10 {}".format(item), callback_data="{}s10".format(attrs["id"])))
+                        sell.append(InlineKeyboardButton("📉 Leave All {}".format(item), callback_data="{}smax".format(attrs["id"])))
 
                     break
 
@@ -245,8 +264,7 @@ def interface(update: Update, context: CallbackContext) -> None:
             choices.append(InlineKeyboardButton("Supergroups", callback_data="{}x".format(stats["supergroups"]["id"])))
 
         if choices:
-            message = "*🧮 Interface 🧮*\n\n" \
-                      "Select what you would like to bargain:"
+            message = "*🧮 Interface 🧮*\n\nSelect what you would like to bargain:"
             reply_markup = InlineKeyboardMarkup([choices])
         else:
             message = "*Interface*\n\nYou don't have enough messages for now\.\.\."
@@ -304,7 +322,6 @@ def get_user_achievements(id: int):
 
 def check_achievements(id: int, context: CallbackContext) -> None:
     data = user_cache[id]["achievements"]
-    print(data)
 
     if data:
         user_achievements = get_user_achievements(id)
@@ -425,6 +442,7 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler(["interface", "buy", "sell", "join", "leave"], interface))
     updater.dispatcher.add_handler(CallbackQueryHandler(interface))
     dispatcher.add_handler(CommandHandler(["achievements", "achievement"], see_achievements))
+    dispatcher.add_handler(CommandHandler(["stats", "stat"], see_stats))
     dispatcher.add_handler(CommandHandler("stop", stop))
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, answer))
 
