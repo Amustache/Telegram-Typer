@@ -26,7 +26,7 @@ main_db = SqliteDatabase("./main.db")
 RESALE_PERCENTAGE = 0.77
 TIME_INTERVAL = 1
 
-user_cache = defaultdict(lambda: {"from_chat": 0, "achievements": 0})
+user_cache = defaultdict(lambda: {"from_chat": 0, "achievements": []})
 
 
 class Players(Model):
@@ -55,7 +55,7 @@ class Players(Model):
     supergroups_state = IntegerField(default=0)
     supergroups_total = FloatField(default=0)
 
-    achievements = IntegerField(default=0)
+    achievements = CharField(default="")
 
     class Meta:
         database = main_db
@@ -78,6 +78,7 @@ def get_stats(id: int):
             "total": user.messages_total,
         },
         "contacts": {
+            "id": "c",
             "unlock_at": {"messages": 10},
             "unlocked": user.contacts_state,
             "price": {"messages": 10},
@@ -86,6 +87,7 @@ def get_stats(id: int):
             "total": user.contacts_total,
         },
         "groups": {
+            "id": "g",
             "unlock_at": {"messages": 100, "contacts": 4},
             "unlocked": user.groups_state,
             "price": {"messages": 100, "contacts": 4},
@@ -94,6 +96,7 @@ def get_stats(id: int):
             "total": user.groups_total,
         },
         "channels": {
+            "id": "h",
             "unlock_at": {"messages": 1000, "contacts": 16},
             "unlocked": user.channels_state,
             "price": {"messages": 1000, "contacts": 16},
@@ -102,6 +105,7 @@ def get_stats(id: int):
             "total": user.channels_total,
         },
         "supergroups": {
+            "id": "s",
             "unlock_at": {"messages": 10000, "contacts": 256, "groups": 1},
             "unlocked": user.supergroups_state,
             "price": {"messages": 10000, "contacts": 256, "groups": 1},
@@ -118,11 +122,11 @@ def start(update: Update, context: CallbackContext) -> None:
 
     user.first_name = _user.first_name
     user.save()
-    update.message.reply_document(open("./img/typing.gif", "rb"), caption="Welcome, {}!".format(user.first_name))
+    update.message.reply_document(open("./img/typing.gif", "rb"), caption="👋 Welcome, {}!".format(user.first_name))
 
     update.message.reply_text("== Placeholder for the tutorial ==")
 
-    update.message.reply_text("You're ready to play!")
+    update.message.reply_text("❕ You're ready to play!")
 
     update.message.reply_text(
         "Now, I am going to pin your counter to this conversation, so that you can see your progress!")
@@ -136,14 +140,14 @@ def start(update: Update, context: CallbackContext) -> None:
         pass
 
     context.bot.pin_chat_message(update.message.chat.id, counter.message_id)
-    user_cache[_user.id]["from_chat"] = 0
-    user_cache[_user.id]["achievements"] = 0
+
+    user_cache[update.effective_user.id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["start"]["id"])
 
     update_job(_user.id, context)
 
 
 def help(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text('Help!')
+    update.message.reply_text('Help!')  # TODO
 
 
 def interface(update: Update, context: CallbackContext) -> None:
@@ -156,326 +160,75 @@ def interface(update: Update, context: CallbackContext) -> None:
         query.answer()
         data = query.data
 
-        # _C_ontacts
-        if data[0] == "c":
-            buy_price = stats["contacts"]["price"]["messages"]
-            sell_price = int(buy_price * RESALE_PERCENTAGE)
+        for item, attrs in stats.items():
+            if "id" in attrs:
+                if data[0] == attrs["id"]:
+                    buy_price = stats[item]["price"]
+                    sell_price = {k: int(v * RESALE_PERCENTAGE) for k, v in buy_price.items()}
 
-            if data[1] == "b":  # Buy
-                if data[2:] == "1":
-                    user.messages -= buy_price
-                    user.contacts += 1
-                    user.contacts_total += 1
-                elif data[2:] == "10":
-                    user.messages -= 10 * buy_price
-                    user.contacts += 10
-                    user.contacts_total += 10
-                else:
-                    qt = user.messages // buy_price
-                    user.messages -= buy_price * qt
-                    user.contacts += qt
-                    user.contacts_total += qt
-                user.save()
-                stats = get_stats(_user.id)
-            elif data[1] == "s":  # Sell
-                if data[2:] == "1":
-                    user.messages += sell_price
-                    user.messages_total += sell_price
-                    user.contacts -= 1
-                elif data[2:] == "10":
-                    user.messages -= 10 * sell_price
-                    user.messages_total += 10 * sell_price
-                    user.contacts -= 10
-                else:
-                    qt = user.contacts * sell_price
-                    user.messages += qt
-                    user.messages_total += qt
-                    user.contacts -= user.contacts
-                user.save()
-                stats = get_stats(_user.id)
+                    if data[1] == "b":  # Buy
+                        if data[2:] == "1":
+                            qt = 1
+                        elif data[2:] == "10":
+                            qt = 10
+                        else:
+                            qt = 999_999_999_999_999
+                            for currency, quantity in buy_price.items():
+                                qt = min(qt, eval("user.{} // quantity".format(currency)))
+                        for currency, quantity in buy_price.items():
+                            exec("user.{} -= qt * quantity".format(currency))
+                        exec("user.{} += qt".format(item))
+                        exec("user.{}_total += qt".format(item))
+                        user.save()
+                        stats = get_stats(_user.id)
+                    elif data[1] == "s":  # Sell
+                        if data[2:] == "1":
+                            qt = 1
+                        elif data[2:] == "10":
+                            qt = 10
+                        else:
+                            qt = eval("user.{}".format(item))
+                        for currency, quantity in sell_price.items():
+                            exec("user.{} += qt * quantity".format(currency))
+                            exec("user.{}_total += qt * quantity".format(currency))
+                        exec("user.{} -= qt".format(item))
+                        user.save()
+                        stats = get_stats(_user.id)
 
-            message = "**Contacts**\n" \
-                      "You have {} Contacts.\n" \
-                      "Find: -{} messages.\n" \
-                      "Forfeit: +{} messages.".format(
-                get_si(stats["contacts"]["quantity"]), get_si(buy_price), get_si(sell_price))
+                    message = "*🧮 Interface 🧮*\n\n*{}*\n".format(item)
+                    message += "- You have {} {}.\n".format(get_si(stats[item]["quantity"]), item)
+                    message += "- Join:"
+                    for currency, quantity in buy_price.items():
+                        message += " -{} {} ".format(quantity, currency)
+                    message += "- Leave:"
+                    for currency, quantity in sell_price.items():
+                        message += " +{} {} ".format(quantity, currency)
 
-            # Select
-            buy = []
-            if stats["messages"]["quantity"] >= buy_price:
-                buy.append(InlineKeyboardButton("Find 1 Contact", callback_data="cb1"))
-                if stats["messages"]["quantity"] >= 10 * buy_price:
-                    buy.append(InlineKeyboardButton("Find 10 Contacts", callback_data="cb10"))
-                buy.append(InlineKeyboardButton("Find Max Contacts", callback_data="cbmax"))
+                    # Select
+                    buy = []
+                    can_buy = 999_999_999_999_999
+                    for currency, quantity in buy_price.items():
+                        can_buy = min(can_buy, stats[currency]["quantity"] // quantity)
+                    if can_buy >= 1:
+                        buy.append(InlineKeyboardButton("Join 1 {}".format(item), callback_data="{}b1".format(attrs["id"])))
+                        if can_buy >= 10:
+                            buy.append(InlineKeyboardButton("Join 10 {}".format(item), callback_data="{}b10".format(attrs["id"])))
+                        buy.append(InlineKeyboardButton("Join Max {}".format(item), callback_data="{}bmax".format(attrs["id"])))
 
-            sell = []
-            if stats["contacts"]["quantity"] >= 1:
-                sell.append(InlineKeyboardButton("Forfeit 1 Contact", callback_data="cs1"))
-                if stats["contacts"]["quantity"] >= 10:
-                    sell.append(InlineKeyboardButton("Forfeit 10 Contacts", callback_data="cs10"))
-                sell.append(InlineKeyboardButton("Forfeit All Contacts", callback_data="csmax"))
+                    sell = []
+                    if stats[item]["quantity"] >= 1:
+                        sell.append(InlineKeyboardButton("Leave 1 {}".format(item), callback_data="{}s1".format(attrs["id"])))
+                        if stats[item]["quantity"] >= 10:
+                            sell.append(InlineKeyboardButton("Leave 10 {}".format(item), callback_data="{}s10".format(attrs["id"])))
+                        sell.append(InlineKeyboardButton("Leave All {}".format(item), callback_data="{}smax".format(attrs["id"])))
 
-        # _G_roups
-        elif data[0] == "g":
-            buy_price = stats["groups"]["price"]
-            sell_price = {k: int(v * RESALE_PERCENTAGE) for k, v in buy_price.items()}
-
-            if data[1] == "b":  # Buy
-                if data[2:] == "1":
-                    user.messages -= buy_price["messages"]
-                    user.contacts -= buy_price["contacts"]
-
-                    user.groups += 1
-                    user.groups_total += 1
-                elif data[2:] == "10":
-                    user.messages -= 10 * buy_price["messages"]
-                    user.contacts -= 10 * buy_price["contacts"]
-
-                    user.groups += 10
-                    user.groups_total += 10
-                else:
-                    qt = min(user.messages // buy_price["messages"], user.contacts // buy_price["contacts"])
-                    user.messages -= buy_price["messages"] * qt
-                    user.contacts -= buy_price["contacts"] * qt
-
-                    user.groups += qt
-                    user.groups_total += qt
-                user.save()
-                stats = get_stats(_user.id)
-            elif data[1] == "s":  # Sell
-                if data[2:] == "1":
-                    user.messages += sell_price["messages"]
-                    user.messages_total += sell_price["messages"]
-                    user.contacts += sell_price["contacts"]
-                    user.contacts_total += sell_price["contacts"]
-
-                    user.groups -= 1
-                elif data[2:] == "10":
-                    user.messages -= 10 * sell_price["messages"]
-                    user.messages_total += 10 * sell_price["messages"]
-                    user.contacts -= 10 * sell_price["contacts"]
-                    user.contacts_total += 10 * sell_price["contacts"]
-
-                    user.groups -= 10
-                else:
-                    qt_messages = user.groups * sell_price["messages"]
-                    user.messages += qt_messages
-                    user.messages_total += qt_messages
-                    qt_contacts = user.groups * sell_price["contacts"]
-                    user.contacts += qt_contacts
-                    user.contacts_total += qt_contacts
-
-                    user.groups -= user.groups
-                user.save()
-                stats = get_stats(_user.id)
-
-            message = "**Groups**\n" \
-                      "You have {} Groups.\n" \
-                      "Join: -{} messages, -{} contacts.\n" \
-                      "Leave: +{} messages, +{} contacts.".format(get_si(stats["groups"]["quantity"]),
-                                                                  get_si(buy_price["messages"]),
-                                                                  get_si(buy_price["contacts"]),
-                                                                  get_si(sell_price["messages"]),
-                                                                  get_si(sell_price["contacts"]))
-
-            # Select
-            buy = []
-            if stats["messages"]["quantity"] >= buy_price["messages"] and stats["contacts"]["quantity"] >= buy_price[
-                "contacts"]:
-                buy.append(InlineKeyboardButton("Join 1 Group", callback_data="gb1"))
-                if stats["messages"]["quantity"] >= 10 * buy_price["messages"] and stats["contacts"]["quantity"] >= 10 * \
-                        buy_price["contacts"]:
-                    buy.append(InlineKeyboardButton("Join 10 Groups", callback_data="gb10"))
-                buy.append(InlineKeyboardButton("Join Max Groups", callback_data="gbmax"))
-
-            sell = []
-            if stats["groups"]["quantity"] >= 1:
-                sell.append(InlineKeyboardButton("Leave 1 Group", callback_data="gs1"))
-                if stats["groups"]["quantity"] >= 10:
-                    sell.append(InlineKeyboardButton("Leave 10 Groups", callback_data="gs10"))
-                sell.append(InlineKeyboardButton("Leave All Groups", callback_data="gsmax"))
-
-        # C_h_annels
-        elif data[0] == "h":
-            buy_price = stats["channels"]["price"]
-            sell_price = {k: int(v * RESALE_PERCENTAGE) for k, v in buy_price.items()}
-
-            if data[1] == "b":  # Buy
-                if data[2:] == "1":
-                    user.messages -= buy_price["messages"]
-                    user.contacts -= buy_price["contacts"]
-
-                    user.channels += 1
-                    user.channels_total += 1
-                elif data[2:] == "10":
-                    user.messages -= 10 * buy_price["messages"]
-                    user.contacts -= 10 * buy_price["contacts"]
-
-                    user.channels += 10
-                    user.channels_total += 10
-                else:
-                    qt = min(user.messages // buy_price["messages"], user.contacts // buy_price["contacts"])
-                    user.messages -= buy_price["messages"] * qt
-                    user.contacts -= buy_price["contacts"] * qt
-
-                    user.channels += qt
-                    user.channels_total += qt
-                user.save()
-                stats = get_stats(_user.id)
-            elif data[1] == "s":  # Sell
-                if data[2:] == "1":
-                    user.messages += sell_price["messages"]
-                    user.messages_total += sell_price["messages"]
-                    user.contacts += sell_price["contacts"]
-                    user.contacts_total += sell_price["contacts"]
-
-                    user.channels -= 1
-                elif data[2:] == "10":
-                    user.messages -= 10 * sell_price["messages"]
-                    user.messages_total += 10 * sell_price["messages"]
-                    user.contacts -= 10 * sell_price["contacts"]
-                    user.contacts_total += 10 * sell_price["contacts"]
-
-                    user.channels -= 10
-                else:
-                    qt_messages = user.channels * sell_price["messages"]
-                    user.messages += qt_messages
-                    user.messages_total += qt_messages
-                    qt_contacts = user.channels * sell_price["contacts"]
-                    user.contacts += qt_contacts
-                    user.contacts_total += qt_contacts
-
-                    user.channels -= user.channels
-                user.save()
-                stats = get_stats(_user.id)
-
-            message = "**Channels**\n" \
-                      "You have {} Channels.\n" \
-                      "Join: -{} messages, -{} contacts.\n" \
-                      "Leave: +{} messages, +{} contacts.".format(get_si(stats["channels"]["quantity"]),
-                                                                  get_si(buy_price["messages"]),
-                                                                  get_si(buy_price["contacts"]),
-                                                                  get_si(sell_price["messages"]),
-                                                                  get_si(sell_price["contacts"]))
-
-            # Select
-            buy = []
-            if stats["messages"]["quantity"] >= buy_price["messages"] and stats["contacts"]["quantity"] >= buy_price[
-                "contacts"]:
-                buy.append(InlineKeyboardButton("Join 1 Channel", callback_data="hb1"))
-                if stats["messages"]["quantity"] >= 10 * buy_price["messages"] and stats["contacts"]["quantity"] >= 10 * \
-                        buy_price["contacts"]:
-                    buy.append(InlineKeyboardButton("Join 10 Channels", callback_data="hb10"))
-                buy.append(InlineKeyboardButton("Join Max Channels", callback_data="hbmax"))
-
-            sell = []
-            if stats["channels"]["quantity"] >= 1:
-                sell.append(InlineKeyboardButton("Leave 1 Channel", callback_data="hs1"))
-                if stats["channels"]["quantity"] >= 10:
-                    sell.append(InlineKeyboardButton("Leave 10 Channels", callback_data="hs10"))
-                sell.append(InlineKeyboardButton("Leave All Channels", callback_data="hsmax"))
-
-        # _S_upergroups
-        elif data[0] == "s":
-            buy_price = stats["supergroups"]["price"]
-            sell_price = {k: int(v * RESALE_PERCENTAGE) for k, v in buy_price.items()}
-
-            if data[1] == "b":  # Buy
-                if data[2:] == "1":
-                    user.messages -= buy_price["messages"]
-                    user.contacts -= buy_price["contacts"]
-                    user.groups -= buy_price["groups"]
-
-                    user.supergroups += 1
-                    user.supergroups_total += 1
-                elif data[2:] == "10":
-                    user.messages -= 10 * buy_price["messages"]
-                    user.contacts -= 10 * buy_price["contacts"]
-                    user.groups -= 10 * buy_price["groups"]
-
-                    user.supergroups += 10
-                    user.supergroups_total += 10
-                else:
-                    qt = min(user.messages // buy_price["messages"], user.contacts // buy_price["contacts"],
-                             user.groups // buy_price["groups"])
-                    user.messages -= buy_price["messages"] * qt
-                    user.contacts -= buy_price["contacts"] * qt
-                    user.groups -= buy_price["groups"] * qt
-
-                    user.supergroups += qt
-                    user.supergroups_total += qt
-                user.save()
-                stats = get_stats(_user.id)
-            elif data[1] == "s":  # Sell
-                if data[2:] == "1":
-                    user.messages += sell_price["messages"]
-                    user.messages_total += sell_price["messages"]
-                    user.contacts += sell_price["contacts"]
-                    user.contacts_total += sell_price["contacts"]
-                    user.groups += sell_price["groups"]
-                    user.groups_total += sell_price["groups"]
-
-                    user.supergroups -= 1
-                elif data[2:] == "10":
-                    user.messages -= 10 * sell_price["messages"]
-                    user.messages_total += 10 * sell_price["messages"]
-                    user.contacts -= 10 * sell_price["contacts"]
-                    user.contacts_total += 10 * sell_price["contacts"]
-                    user.groups -= 10 * sell_price["groups"]
-                    user.groups_total += 10 * sell_price["groups"]
-
-                    user.supergroups -= 10
-                else:
-                    qt_messages = user.supergroups * sell_price["messages"]
-                    user.messages += qt_messages
-                    user.messages_total += qt_messages
-                    qt_contacts = user.supergroups * sell_price["contacts"]
-                    user.contacts += qt_contacts
-                    user.contacts_total += qt_contacts
-                    qt_groups = user.supergroups * sell_price["groups"]
-                    user.groups += qt_groups
-                    user.groups_total += qt_groups
-
-                    user.supergroups -= user.supergroups
-                user.save()
-                stats = get_stats(_user.id)
-
-            message = "**Supergroups**\n" \
-                      "You have {} Supergroups.\n" \
-                      "Join: -{} messages, -{} contacts, -{} groups.\n" \
-                      "Leave: +{} messages, +{} contacts, +{} groups.".format(get_si(stats["supergroups"]["quantity"]),
-                                                                              get_si(buy_price["messages"]),
-                                                                              get_si(buy_price["contacts"]),
-                                                                              get_si(buy_price["groups"]),
-                                                                              get_si(sell_price["messages"]),
-                                                                              get_si(sell_price["contacts"]),
-                                                                              get_si(sell_price["groups"]))
-
-            # Select
-            buy = []
-            if stats["messages"]["quantity"] >= buy_price["messages"] and stats["contacts"]["quantity"] >= buy_price[
-                "contacts"] and stats["groups"]["quantity"] >= buy_price[
-                "groups"]:
-                buy.append(InlineKeyboardButton("Join 1 Supergroup", callback_data="sb1"))
-                if stats["messages"]["quantity"] >= 10 * buy_price["messages"] and stats["contacts"]["quantity"] >= 10 * \
-                        buy_price["contacts"] and stats["groups"]["quantity"] >= 10 * \
-                        buy_price["groups"]:
-                    buy.append(InlineKeyboardButton("Join 10 Supergroups", callback_data="sb10"))
-                buy.append(InlineKeyboardButton("Join Max Supergroups", callback_data="sbmax"))
-
-            sell = []
-            if stats["supergroups"]["quantity"] >= 1:
-                sell.append(InlineKeyboardButton("Leave 1 Supergroup", callback_data="ss1"))
-                if stats["supergroups"]["quantity"] >= 10:
-                    sell.append(InlineKeyboardButton("Leave 10 Supergroups", callback_data="ss10"))
-                sell.append(InlineKeyboardButton("Leave All Supergroups", callback_data="ssmax"))
-        else:
-            raise ValueError("Invalid argument: {}.".format(data))
+                    break
 
         reply_markup = InlineKeyboardMarkup([buy, sell, [InlineKeyboardButton("Back", callback_data="stop")]])
 
         try:
             query.edit_message_text(message, reply_markup=reply_markup)
+            update_player(_user.id, context)
         except BadRequest:  # Not edit to be done
             pass
 
@@ -483,16 +236,16 @@ def interface(update: Update, context: CallbackContext) -> None:
         stats = get_stats(_user.id)
         choices = []
         if stats["contacts"]["unlocked"]:
-            choices.append(InlineKeyboardButton("Contacts", callback_data="cx"))
+            choices.append(InlineKeyboardButton("Contacts", callback_data="{}x".format(stats["contacts"]["id"])))
         if stats["groups"]["unlocked"]:
-            choices.append(InlineKeyboardButton("Groups", callback_data="gx"))
+            choices.append(InlineKeyboardButton("Groups", callback_data="{}x".format(stats["groups"]["id"])))
         if stats["channels"]["unlocked"]:
-            choices.append(InlineKeyboardButton("Channels", callback_data="hx"))
+            choices.append(InlineKeyboardButton("Channels", callback_data="{}x".format(stats["channels"]["id"])))
         if stats["supergroups"]["unlocked"]:
-            choices.append(InlineKeyboardButton("Supergroups", callback_data="sx"))
+            choices.append(InlineKeyboardButton("Supergroups", callback_data="{}x".format(stats["supergroups"]["id"])))
 
         if choices:
-            message = "*Interface*\n\n" \
+            message = "*🧮 Interface 🧮*\n\n" \
                       "Select what you would like to bargain:"
             reply_markup = InlineKeyboardMarkup([choices])
         else:
@@ -507,7 +260,7 @@ def interface(update: Update, context: CallbackContext) -> None:
 
 def stop(update: Update, context: CallbackContext) -> None:
     Players.delete().where(Players.id == update.effective_user.id).execute()
-    update.message.reply_text('Stop!')
+    update.message.reply_text('Stop!')  # TODO
 
 
 def check_unlocks(id: int, context: CallbackContext) -> None:
@@ -525,8 +278,7 @@ def check_unlocks(id: int, context: CallbackContext) -> None:
                 # Worst thing I ever wrote probably, sorry not sorry.
                 exec("user.{}_state = 1".format(item))
                 user.save()
-                user_cache[id]["achievements"] |= 1 << ACHIEVEMENTS_ID[item]["unlocked"]["id"]
-                context.bot.send_message(id, "Déblockage", parse_mode='MarkdownV2')
+                user_cache[id]["achievements"].append(ACHIEVEMENTS_ID[item]["unlocked"]["id"])
 
 
 def update_pinned_message(id: int, context: CallbackContext) -> None:
@@ -547,24 +299,25 @@ def update_pinned_message(id: int, context: CallbackContext) -> None:
 
 def get_user_achievements(id: int):
     user, _ = get_or_create_user(id)
-    return [a for a, b in enumerate(bin(user.achievements)[2:][::-1]) if b == "1"]
+    return [int(num) for num in user.achievements.split(",") if num]
 
 
 def check_achievements(id: int, context: CallbackContext) -> None:
     data = user_cache[id]["achievements"]
+    print(data)
+
     if data:
-        user, _ = get_or_create_user(id)
-        for ref, value in enumerate(bin(data)[2:][::-1]):
-            ref = int(ref)
-            value = int(value)
-            if value and not user.achievements & (1 << ref):
-                medal, title, text = ACHIEVEMENTS[ref]
+        user_achievements = get_user_achievements(id)
+        for achievement in data:
+            if achievement not in user_achievements:
+                medal, title, text = ACHIEVEMENTS[achievement]
                 message = "*{} {} {}*\n_{}_".format(medal, title, medal, text)
                 context.bot.send_message(id, message, parse_mode='MarkdownV2')
 
-        user.achievements |= data
+        user, _ = get_or_create_user(id)
+        user.achievements = ','.join([str(num) for num in set(user_achievements + data)])
         user.save()
-        user_cache[id]["achievements"] = 0
+        user_cache[id]["achievements"] = []
 
 
 def see_achievements(update: Update, context: CallbackContext) -> None:
@@ -573,23 +326,29 @@ def see_achievements(update: Update, context: CallbackContext) -> None:
 
     if context.args:
         try:
-            value = int(context.args[0])
-            if value < 0 or value > MAX_ACHIEVEMENTS:
+            value = int(context.args[0], 16)
+            if value < 0 or value > 0xff:
                 raise ValueError
         except ValueError:
             update.message.reply_text("Usage: `/achievement` or `/achievement number`")
             return
 
-        medal, title, text = ACHIEVEMENTS[value]
+        try:
+            medal, title, text = ACHIEVEMENTS[value]
+        except ValueError:
+            update.message.reply_text("Wrong achievement number.")
+            return
+
         if not value in user_achievements:
             medal = question
             text = "\[You don't have this achievement just yet\.\.\.\]"
         message = "*{} {} {}*\n_{}_".format(medal, title, medal, text)
         update.message.reply_text(message, parse_mode='MarkdownV2')
     else:
-        things = ["{:02d}: {}".format(id, medal if id in user_achievements else question) for id, (medal, _, _) in sorted(ACHIEVEMENTS.items())]
+        things = ["{:02X}: {}".format(id, medal if id in user_achievements else question) for id, (medal, _, _) in
+                  sorted(ACHIEVEMENTS.items())]
         things = [things[i:i + 5] for i in range(0, len(things), 5)]
-        message = "*Achievements*\n\n"
+        message = "*🌟 Achievements 🌟*\n\n"
         message += "\n".join([", ".join(text) for text in things])
         message += "\n\nUse `/achievement number` to have more information\."
 
@@ -607,8 +366,7 @@ def answer(update: Update, context: CallbackContext) -> None:
     update.message.reply_text(update.message.text)  # TODO
     user_cache[update.effective_user.id]["from_chat"] += 2
     if update.message.text == "J'aime les loutres":
-        user_cache[update.effective_user.id]["achievements"] |= 1 << ACHIEVEMENTS_ID["misc"]["loutres"]["id"]
-        print(user_cache)
+        user_cache[update.effective_user.id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["loutres"]["id"])
 
 
 def update_from_job(context: CallbackContext) -> None:
