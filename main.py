@@ -215,10 +215,11 @@ def interface(update: Update, context: CallbackContext) -> None:
                         stats = get_stats(_user.id)
 
                     message = "*🧮 Interface 🧮*\n\n*{}*\n".format(item)
-                    message += "- You have {} {}.\n".format(get_si(stats[item]["quantity"]), item)
+                    message += "You have {} {}.\n".format(get_si(stats[item]["quantity"]), item)
                     message += "📈 Join:"
                     for currency, quantity in buy_price.items():
                         message += " -{} {} ".format(quantity, currency)
+                    message += "\n"
                     message += "📉 Leave:"
                     for currency, quantity in sell_price.items():
                         message += " +{} {} ".format(quantity, currency)
