@@ -44,3 +44,7 @@ def send_typing_action(func):
         return func(update, context, *args, **kwargs)
 
     return command_func
+
+
+def power_10(number: int) -> int:
+    return 10 ** (len(str(int(number))) - 1)

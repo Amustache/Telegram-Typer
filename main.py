@@ -1,17 +1,19 @@
 #!/usr/bin/env python
 # pylint: disable=C0116,W0613
 import logging
+from time import sleep
 
 from peewee import BigIntegerField, CharField, FloatField, IntegerField, Model, SqliteDatabase
 from achievements import ACHIEVEMENTS, ACHIEVEMENTS_ID, MAX_ACHIEVEMENTS
-from collections import defaultdict
+from collections import defaultdict, Counter
+from datetime import datetime
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ForceReply, ChatAction
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, Filters, CallbackContext
 from telegram.error import BadRequest
-from helpers import get_si, send_typing_action
+from helpers import get_si, send_typing_action, power_10
 
-from secret import BOT_TOKEN
+from secret import BOT_TOKEN, BOT_NAME
 
 # Enable logging
 logging.basicConfig(
@@ -21,7 +23,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Database
-main_db = SqliteDatabase("./main.db")
+main_db = SqliteDatabase("./database.db")
 
 RESALE_PERCENTAGE = 0.77
 TIME_INTERVAL = 1
@@ -69,7 +71,7 @@ def get_or_create_user(id: int):
     return Players.get_or_create(id=id)
 
 
-def get_stats(id: int):
+def get_user_stats(id: int):
     user, _ = get_or_create_user(id)
 
     return {
@@ -116,65 +118,88 @@ def get_stats(id: int):
     }
 
 
-def see_stats(update: Update, context: CallbackContext) -> None:
-    stats = get_stats(update.effective_user.id)
-    message = "*📊 Stats 📊*\n\n"
+def handler_stats(update: Update, context: CallbackContext) -> None:
+    logger.info("{} requested the stats".format(update.effective_user.first_name))
 
-    message += "*{}*\n".format("messages")
-    message += "Current {}: {}\n".format("messages", get_si(stats["messages"]["quantity"]))
-    message += "Total {}: {}\n".format("messages", get_si(stats["messages"]["total"]))
+    stats = get_user_stats(update.effective_user.id)
+    message = "*📊 Stats 📊*\n_Stats of {} as of {}\._\n\n".format(update.effective_user.first_name, datetime.now().strftime("%B %d, %Y at %H:%M GMT\+1"))
+
+    user_achievements = get_user_achievements(update.effective_user.id)
+    medals = Counter([medal for id, (medal, _, _) in sorted(ACHIEVEMENTS.items()) if id in user_achievements])
+    message += "*Achievements*\n"
+    message += "– Unlocked {} achievements out of {}\.\n".format(sum(medals.values()), MAX_ACHIEVEMENTS)
+    message += "– {}\n".format(", ".join(["{} {}".format(qt, medal) for medal, qt in medals.items()]))
+    message += "\n"
+
+    message += "*{}*\n".format("Messages")
+    message += "– {} current {}\.\n".format(get_si(stats["messages"]["quantity"]), "messages")
+    message += "– {} {} in total\.\n".format(get_si(stats["messages"]["total"]), "messages")
     message += "\n"
 
     for item, attrs in stats.items():  # e.g., "contacts": {"unlock_at", ...}
         if "unlock_at" in attrs and stats[item]["unlocked"]:
-            message += "*{}*\n".format(item)
-            message += "Current {}: {}\n".format(item, get_si(attrs["quantity"]))
-            message += "Total {}: {}\n".format(item, get_si(attrs["total"]))
+            message += "*{}*\n".format(item.capitalize())
+            message += "– {} current {}\.\n".format(get_si(attrs["quantity"]), item)
+            message += "– {} {} in total\.\n".format(get_si(attrs["total"]), item)
             message += "\n"
+
+    message += BOT_NAME
 
     update.message.reply_text(message, parse_mode='MarkdownV2')
 
 
-def start(update: Update, context: CallbackContext) -> None:
+def handler_start(update: Update, context: CallbackContext) -> None:
+    logger.info("{} started the bot".format(update.effective_user.first_name))
+
+    _user = update.effective_user
+    update.message.reply_document(open("./img/typing.gif", "rb"), caption="👋 Welcome, {}!".format(_user.first_name))
+
+    update.message.reply_text("Press /new_game to play!")
+
+
+def handler_new(update: Update, context: CallbackContext) -> None:
+    logger.info("{} started a new game".format(update.effective_user.first_name))
+
     _user = update.effective_user
     user, created = get_or_create_user(_user.id)
 
-    user.first_name = _user.first_name
-    user.save()
-    update.message.reply_document(open("./img/typing.gif", "rb"), caption="👋 Welcome, {}!".format(user.first_name))
+    if created:
+        user.first_name = _user.first_name
+        user.save()
 
-    update.message.reply_text("== Placeholder for the tutorial ==")
+        user_cache[update.effective_user.id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["start"]["id"])
 
-    update.message.reply_text("❕ You're ready to play!")
+        update.message.reply_text("❕ You're ready to play!")
 
-    update.message.reply_text(
-        "Now, I am going to pin your counter to this conversation, so that you can see your progress!")
-    counter = update.message.reply_text("Start talking to play!")
+        update.message.reply_text("Use /new_game to start a new game, or to reset a blocked counter.\nUse /interface to show the interface to buy/sell things.\nUse /achievements to show your achievements.\nUse /stats to get your stats to share with your friends.\nFinally, use /end to stop the game and delete your account.")
+
+        update.message.reply_text(
+            "Now, I am going to pin your counter to this conversation, so that you can see your progress!")
+
+    sleep(1)  # ... Fnck you.
+    counter = update.message.reply_text("Send a text (not a command!) to the bot to see this message update.\n(If the pinned message does not update, please do /new_game again.)")
     user.pinned_message = counter.message_id
     user.save()
-
     try:
         context.bot.unpin_chat_message(update.message.chat.id)
     except:
         pass
-
     context.bot.pin_chat_message(update.message.chat.id, counter.message_id)
-
-    user_cache[update.effective_user.id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["start"]["id"])
-
     update_job(_user.id, context)
 
 
-def help(update: Update, context: CallbackContext) -> None:
+def handler_help(update: Update, context: CallbackContext) -> None:
+    logger.info("{} requested the help".format(update.effective_user.first_name))
+
     update.message.reply_text('Help!')  # TODO
 
 
-def interface(update: Update, context: CallbackContext) -> None:
+def handler_interface(update: Update, context: CallbackContext) -> None:
     _user = update.effective_user
     user, _ = get_or_create_user(_user.id)
 
     if update.callback_query and update.callback_query.data != "stop":  # Choices
-        stats = get_stats(_user.id)
+        stats = get_user_stats(_user.id)
         query = update.callback_query
         query.answer()
         data = query.data
@@ -199,7 +224,18 @@ def interface(update: Update, context: CallbackContext) -> None:
                         exec("user.{} += qt".format(item))
                         exec("user.{}_total += qt".format(item))
                         user.save()
-                        stats = get_stats(_user.id)
+                        stats = get_user_stats(_user.id)
+
+                        if 10 <= stats[item]["quantity"] <= 1_000_000:
+                            ach = power_10(stats[item]["quantity"])
+                            while ach >= 10:
+                                user_cache[update.effective_user.id]["achievements"].append(ACHIEVEMENTS_ID[item]["quantity{}".format(ach)]["id"])
+                                ach //= 10
+                        if 10 <= stats[item]["total"] <= 1_000_000:
+                            ach = power_10(stats[item]["total"])
+                            while ach >= 10:
+                                user_cache[update.effective_user.id]["achievements"].append(ACHIEVEMENTS_ID[item]["total{}".format(ach)]["id"])
+                                ach //= 10
                     elif data[1] == "s":  # Sell
                         if data[2:] == "1":
                             qt = 1
@@ -212,17 +248,17 @@ def interface(update: Update, context: CallbackContext) -> None:
                             exec("user.{}_total += qt * quantity".format(currency))
                         exec("user.{} -= qt".format(item))
                         user.save()
-                        stats = get_stats(_user.id)
+                        stats = get_user_stats(_user.id)
 
-                    message = "*🧮 Interface 🧮*\n\n*{}*\n".format(item)
-                    message += "You have {} {}.\n".format(get_si(stats[item]["quantity"]), item)
+                    message = "*🧮 Interface 🧮*\n\n*{}*\n".format(item.capitalize())
+                    message += "You have {} {}\.\n".format(get_si(stats[item]["quantity"]), item)
                     message += "📈 Join:"
                     for currency, quantity in buy_price.items():
-                        message += " -{} {} ".format(quantity, currency)
+                        message += " –{} {} ".format(quantity, currency)
                     message += "\n"
                     message += "📉 Leave:"
                     for currency, quantity in sell_price.items():
-                        message += " +{} {} ".format(quantity, currency)
+                        message += " \+{} {} ".format(quantity, currency)
 
                     # Select
                     buy = []
@@ -247,22 +283,19 @@ def interface(update: Update, context: CallbackContext) -> None:
         reply_markup = InlineKeyboardMarkup([buy, sell, [InlineKeyboardButton("Back", callback_data="stop")]])
 
         try:
-            query.edit_message_text(message, reply_markup=reply_markup)
+            query.edit_message_text(message, reply_markup=reply_markup, parse_mode='MarkdownV2')
             update_player(_user.id, context)
         except BadRequest:  # Not edit to be done
             pass
 
     else:  # Main
-        stats = get_stats(_user.id)
+        logger.info("{} requested the interface".format(update.effective_user.first_name))
+
+        stats = get_user_stats(_user.id)
         choices = []
-        if stats["contacts"]["unlocked"]:
-            choices.append(InlineKeyboardButton("Contacts", callback_data="{}x".format(stats["contacts"]["id"])))
-        if stats["groups"]["unlocked"]:
-            choices.append(InlineKeyboardButton("Groups", callback_data="{}x".format(stats["groups"]["id"])))
-        if stats["channels"]["unlocked"]:
-            choices.append(InlineKeyboardButton("Channels", callback_data="{}x".format(stats["channels"]["id"])))
-        if stats["supergroups"]["unlocked"]:
-            choices.append(InlineKeyboardButton("Supergroups", callback_data="{}x".format(stats["supergroups"]["id"])))
+        for item, attrs in stats.items():  # e.g., "contacts": {"unlock_at", ...}
+            if "unlock_at" in attrs and stats[item]["unlocked"]:
+                choices.append(InlineKeyboardButton(item.capitalize(), callback_data="{}x".format(stats[item]["id"])))
 
         if choices:
             message = "*🧮 Interface 🧮*\n\nSelect what you would like to bargain:"
@@ -277,14 +310,22 @@ def interface(update: Update, context: CallbackContext) -> None:
             update.message.reply_text(message, reply_markup=reply_markup, parse_mode='MarkdownV2')
 
 
-def stop(update: Update, context: CallbackContext) -> None:
+def handler_stop(update: Update, context: CallbackContext) -> None:
+    logger.info("{} deleted their account".format(update.effective_user.first_name))
+
     Players.delete().where(Players.id == update.effective_user.id).execute()
-    update.message.reply_text('Stop!')  # TODO
+
+    try:
+        context.bot.unpin_chat_message(update.message.chat.id)
+    except:
+        pass
+
+    update.message.reply_text('Game stopped, account deleted.')  # TODO
 
 
-def check_unlocks(id: int, context: CallbackContext) -> None:
+def update_unlocks(id: int, context: CallbackContext) -> None:
     user, _ = get_or_create_user(id)
-    stats = get_stats(id)
+    stats = get_user_stats(id)
 
     for item, attrs in stats.items():  # e.g., "contacts": {"unlock_at", ...}
         if "unlock_at" in attrs and not stats[item]["unlocked"]:
@@ -321,7 +362,7 @@ def get_user_achievements(id: int):
     return [int(num) for num in user.achievements.split(",") if num]
 
 
-def check_achievements(id: int, context: CallbackContext) -> None:
+def update_achievements(id: int, context: CallbackContext) -> None:
     data = user_cache[id]["achievements"]
 
     if data:
@@ -338,7 +379,9 @@ def check_achievements(id: int, context: CallbackContext) -> None:
         user_cache[id]["achievements"] = []
 
 
-def see_achievements(update: Update, context: CallbackContext) -> None:
+def handler_achievements(update: Update, context: CallbackContext) -> None:
+    logger.info("{} requested the achievements".format(update.effective_user.first_name))
+
     user_achievements = get_user_achievements(update.effective_user.id)
     question = "❔"
 
@@ -374,23 +417,23 @@ def see_achievements(update: Update, context: CallbackContext) -> None:
 
 
 def update_player(id: int, context: CallbackContext) -> None:
-    check_unlocks(id, context)
+    update_unlocks(id, context)
     update_pinned_message(id, context)
-    check_achievements(id, context)
+    update_achievements(id, context)
 
 
 @send_typing_action
-def answer(update: Update, context: CallbackContext) -> None:
+def handler_answer(update: Update, context: CallbackContext) -> None:
     update.message.reply_text(update.message.text)  # TODO
     user_cache[update.effective_user.id]["from_chat"] += 2
     if update.message.text == "J'aime les loutres":
         user_cache[update.effective_user.id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["loutres"]["id"])
 
 
-def update_from_job(context: CallbackContext) -> None:
+def update_messages_and_contacts_from_job(context: CallbackContext) -> None:
     id = context.job.context
     user, _ = get_or_create_user(id)
-    stats = get_stats(id)
+    stats = get_user_stats(id)
 
     messages_to_add = 0
     contacts_to_add = 0
@@ -413,6 +456,31 @@ def update_from_job(context: CallbackContext) -> None:
         user.contacts_total += TIME_INTERVAL * contacts_to_add
         user.save()
 
+        if 10 <= user.messages <= 1_000_000:
+            ach = power_10(user.messages)
+            while ach >= 10:
+                user_cache[id]["achievements"].append(
+                    ACHIEVEMENTS_ID["messages"]["quantity{}".format(ach)]["id"])
+                ach //= 10
+        if 10 <= user.messages_total <= 1_000_000:
+            ach = power_10(user.messages_total)
+            while ach >= 10:
+                user_cache[id]["achievements"].append(
+                    ACHIEVEMENTS_ID["messages"]["total{}".format(ach)]["id"])
+                ach //= 10
+        if 10 <= user.contacts <= 1_000_000:
+            ach = power_10(user.contacts)
+            while ach >= 10:
+                user_cache[id]["achievements"].append(
+                    ACHIEVEMENTS_ID["contacts"]["quantity{}".format(ach)]["id"])
+                ach //= 10
+        if 10 <= user.contacts_total <= 1_000_000:
+            ach = power_10(user.contacts_total)
+            while ach >= 10:
+                user_cache[id]["achievements"].append(
+                    ACHIEVEMENTS_ID["contacts"]["total{}".format(ach)]["id"])
+                ach //= 10
+
         update_player(id, context)
 
 
@@ -428,7 +496,7 @@ def remove_job_if_exists(name: str, context: CallbackContext) -> bool:
 def update_job(id: int, context: CallbackContext) -> None:
     try:
         remove_job_if_exists(str(id), context)
-        context.job_queue.run_repeating(update_from_job, TIME_INTERVAL, context=id, name=str(id))
+        context.job_queue.run_repeating(update_messages_and_contacts_from_job, TIME_INTERVAL, context=id, name=str(id))
     except (IndexError, ValueError):
         pass
 
@@ -438,14 +506,15 @@ def main() -> None:
     dispatcher = updater.dispatcher
 
     # Commands
-    dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(CommandHandler("help", help))
-    dispatcher.add_handler(CommandHandler(["interface", "buy", "sell", "join", "leave"], interface))
-    updater.dispatcher.add_handler(CallbackQueryHandler(interface))
-    dispatcher.add_handler(CommandHandler(["achievements", "achievement"], see_achievements))
-    dispatcher.add_handler(CommandHandler(["stats", "stat"], see_stats))
-    dispatcher.add_handler(CommandHandler("stop", stop))
-    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, answer))
+    dispatcher.add_handler(CommandHandler("start", handler_start))
+    dispatcher.add_handler(CommandHandler(["new_game", "new"], handler_new))
+    dispatcher.add_handler(CommandHandler("help", handler_help))
+    dispatcher.add_handler(CommandHandler(["interface", "buy", "sell", "join", "leave"], handler_interface))
+    updater.dispatcher.add_handler(CallbackQueryHandler(handler_interface))
+    dispatcher.add_handler(CommandHandler(["achievements", "achievement"], handler_achievements))
+    dispatcher.add_handler(CommandHandler(["stats", "stat"], handler_stats))
+    dispatcher.add_handler(CommandHandler(["stop", "end", "end_game"], handler_stop))
+    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handler_answer))
 
     # Jobs go here
     # TODO
