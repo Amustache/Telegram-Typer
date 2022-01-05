@@ -141,6 +141,8 @@ def handler_stats(update: Update, context: CallbackContext) -> None:
             message += "*{}*\n".format(item.capitalize())
             message += "– {} current {}\.\n".format(get_si(attrs["quantity"]), item)
             message += "– {} {} in total\.\n".format(get_si(attrs["total"]), item)
+            for currency, quantity in attrs["gain"].items():
+                message += "– Add {} {} per second\.\n".format(str(quantity).replace(".", "\.").replace("-", "–"), currency)
             message += "\n"
 
     message += BOT_NAME
@@ -367,7 +369,7 @@ def set_unlocks(id: int) -> None:
 
 def get_quantities(id: int) -> str:
     user, _ = get_or_create_user(id)
-    message = "– 💬 Messages: {}".format(get_si(user.messages))
+    message = "\– 💬 Messages: {}".format(get_si(user.messages))
     if user.contacts_state:
         message += "\n– 📇 Contacts: {}".format(get_si(user.contacts))
     if user.groups_state:
@@ -456,8 +458,8 @@ def handler_achievements(update: Update, context: CallbackContext) -> None:
 
 
 def update_player(id: int, context: CallbackContext) -> None:
-    set_cooldown(id, context)
-    set_unlocks(id, context)
+    set_cooldown(id)
+    set_unlocks(id)
     update_pinned_message(id, context)
     update_achievements(id, context)
 
