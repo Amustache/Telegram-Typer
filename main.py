@@ -13,7 +13,7 @@ from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageH
 from telegram.error import BadRequest, RetryAfter
 from helpers import get_si, send_typing_action, power_10
 
-from secret import BOT_TOKEN, BOT_NAME
+from secret import BOT_TOKEN, BOT_NAME, ADMIN_CHAT
 
 # Enable logging
 logging.basicConfig(
@@ -116,6 +116,14 @@ def get_user_stats(id: int) -> dict:
             "total": user.supergroups_total,
         },
     }
+
+
+def handler_debug(update: Update, context: CallbackContext) -> None:
+    id = update.effective_user.id
+    if id == ADMIN_CHAT:
+        user = get_or_create_user(id)
+        user.messages += 10_000_000_000
+        user.save()
 
 
 def handler_stats(update: Update, context: CallbackContext) -> None:
@@ -568,6 +576,7 @@ def main() -> None:
 
     # Commands
     dispatcher.add_handler(CommandHandler("start", handler_start))
+    dispatcher.add_handler(CommandHandler("debug", handler_debug))
     dispatcher.add_handler(CommandHandler(["new_game", "new"], handler_new))
     dispatcher.add_handler(CommandHandler("help", handler_help))
     dispatcher.add_handler(CommandHandler(["interface", "buy", "sell", "join", "leave"], handler_interface))
