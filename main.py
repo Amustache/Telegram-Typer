@@ -10,7 +10,7 @@ from datetime import datetime
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ForceReply, ChatAction
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, Filters, CallbackContext
-from telegram.error import BadRequest
+from telegram.error import BadRequest, RetryAfter
 from helpers import get_si, send_typing_action, power_10
 
 from secret import BOT_TOKEN, BOT_NAME
@@ -28,7 +28,7 @@ main_db = SqliteDatabase("./database.db")
 RESALE_PERCENTAGE = 0.77
 TIME_INTERVAL = 1
 
-user_cache = defaultdict(lambda: {"from_chat": 0, "achievements": []})
+user_cache = defaultdict(lambda: {"from_chat": 0, "achievements": [], "cooldown": {"informed": False, "retryafter": 0, "counter": 0}})
 
 
 class Players(Model):
@@ -197,6 +197,8 @@ def handler_help(update: Update, context: CallbackContext) -> None:
 def handler_interface(update: Update, context: CallbackContext) -> None:
     _user = update.effective_user
     user, _ = get_or_create_user(_user.id)
+    if get_user_cooldown_and_notify(id, context):
+        return
 
     if update.callback_query and update.callback_query.data != "stop":  # Choices
         stats = get_user_stats(_user.id)
@@ -310,6 +312,25 @@ def handler_interface(update: Update, context: CallbackContext) -> None:
             update.message.reply_text(message, reply_markup=reply_markup, parse_mode='MarkdownV2')
 
 
+def get_user_cooldown_and_notify(id: int, context: CallbackContext) -> bool:
+    if user_cache[id]["cooldown"]["retryafter"]:
+        if not user_cache[id]["cooldown"]["informed"]:
+            context.bot.send_message(id, "Oops! I have been a bit spammy...\nI have to wait about {} before we can play again!".format(user_cache[id]["cooldown"]["retryafter"]))
+        return True
+    else:
+        return False
+
+
+def update_cooldown(id: int, context: CallbackContext, COUNTER_LIMIT=100) -> None:
+    if user_cache[id]["cooldown"]["counter"] >= COUNTER_LIMIT:
+        user_cache[id]["cooldown"]["retryafter"] = 3
+        user_cache[id]["cooldown"]["counter"] = 0
+    if user_cache[id]["cooldown"]["retryafter"]:
+        user_cache[id]["cooldown"]["retryafter"] -= 1
+    if user_cache[id]["cooldown"]["retryafter"] < 0:
+        user_cache[id]["cooldown"]["retryafter"] = 0
+
+
 def handler_stop(update: Update, context: CallbackContext) -> None:
     logger.info("{} deleted their account".format(update.effective_user.first_name))
 
@@ -343,6 +364,8 @@ def update_unlocks(id: int, context: CallbackContext) -> None:
 
 def update_pinned_message(id: int, context: CallbackContext) -> None:
     user, _ = get_or_create_user(id)
+    if get_user_cooldown_and_notify(id, context):
+        return
 
     message = "– 💬 Messages: {}".format(get_si(user.messages))
     if user.contacts_state:
@@ -354,7 +377,12 @@ def update_pinned_message(id: int, context: CallbackContext) -> None:
     if user.supergroups_state:
         message += "\n– 👥 Supergroups: {}".format(get_si(user.supergroups))
 
-    context.bot.edit_message_text(message, user.id, user.pinned_message)
+    try:
+        context.bot.edit_message_text(message, id, user.pinned_message)
+    except RetryAfter as e:
+        user_cache[id]["cooldown"]["retryafter"] = e.retryafter
+    except BadRequest:  # Edit problem
+        context.bot.send_message(id, "Oops\! It seems like I did not find the pinned message\. Could you use /new_game again, please\?", parse_mode='MarkdownV2')
 
 
 def get_user_achievements(id: int):
@@ -417,6 +445,7 @@ def handler_achievements(update: Update, context: CallbackContext) -> None:
 
 
 def update_player(id: int, context: CallbackContext) -> None:
+    update_cooldown(id, context)
     update_unlocks(id, context)
     update_pinned_message(id, context)
     update_achievements(id, context)
@@ -424,10 +453,18 @@ def update_player(id: int, context: CallbackContext) -> None:
 
 @send_typing_action
 def handler_answer(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text(update.message.text)  # TODO
-    user_cache[update.effective_user.id]["from_chat"] += 2
-    if update.message.text == "J'aime les loutres":
-        user_cache[update.effective_user.id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["loutres"]["id"])
+    id = update.effective_user.id
+    if get_user_cooldown_and_notify(id, context):
+        return
+
+    try:
+        update.message.reply_text(update.message.text)  # TODO
+        user_cache[update.effective_user.id]["from_chat"] += 2
+        if update.message.text == "J'aime les loutres":
+            user_cache[update.effective_user.id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["loutres"]["id"])
+        user_cache[id]["cooldown"]["counter"] += 1
+    except RetryAfter as e:
+        user_cache[id]["cooldown"]["retryafter"] = e.retryafter
 
 
 def update_messages_and_contacts_from_job(context: CallbackContext) -> None:
