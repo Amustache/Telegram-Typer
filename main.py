@@ -67,11 +67,11 @@ main_db.connect()
 main_db.create_tables([Players])
 
 
-def get_or_create_user(id: int):
+def get_or_create_user(id: int) -> Players:
     return Players.get_or_create(id=id)
 
 
-def get_user_stats(id: int):
+def get_user_stats(id: int) -> dict:
     user, _ = get_or_create_user(id)
 
     return {
@@ -141,6 +141,8 @@ def handler_stats(update: Update, context: CallbackContext) -> None:
             message += "*{}*\n".format(item.capitalize())
             message += "– {} current {}\.\n".format(get_si(attrs["quantity"]), item)
             message += "– {} {} in total\.\n".format(get_si(attrs["total"]), item)
+            for currency, quantity in attrs["gain"].items():
+                message += "– Add {} {} per second\.\n".format(str(quantity).replace(".", "\.").replace("-", "–"), currency)
             message += "\n"
 
     message += BOT_NAME
@@ -195,13 +197,13 @@ def handler_help(update: Update, context: CallbackContext) -> None:
 
 
 def handler_interface(update: Update, context: CallbackContext) -> None:
-    _user = update.effective_user
-    user, _ = get_or_create_user(_user.id)
-    if get_user_cooldown_and_notify(id, context):
+    id = update.effective_user.id
+    user, _ = get_or_create_user(id)
+    if update_cooldown_and_notify(id, context):
         return
 
     if update.callback_query and update.callback_query.data != "stop":  # Choices
-        stats = get_user_stats(_user.id)
+        stats = get_user_stats(id)
         query = update.callback_query
         query.answer()
         data = query.data
@@ -226,7 +228,7 @@ def handler_interface(update: Update, context: CallbackContext) -> None:
                         exec("user.{} += qt".format(item))
                         exec("user.{}_total += qt".format(item))
                         user.save()
-                        stats = get_user_stats(_user.id)
+                        stats = get_user_stats(id)
 
                         if 10 <= stats[item]["quantity"] <= 1_000_000:
                             ach = power_10(stats[item]["quantity"])
@@ -250,7 +252,7 @@ def handler_interface(update: Update, context: CallbackContext) -> None:
                             exec("user.{}_total += qt * quantity".format(currency))
                         exec("user.{} -= qt".format(item))
                         user.save()
-                        stats = get_user_stats(_user.id)
+                        stats = get_user_stats(id)
 
                     message = "*🧮 Interface 🧮*\n\n*{}*\n".format(item.capitalize())
                     message += "You have {} {}\.\n".format(get_si(stats[item]["quantity"]), item)
@@ -286,21 +288,23 @@ def handler_interface(update: Update, context: CallbackContext) -> None:
 
         try:
             query.edit_message_text(message, reply_markup=reply_markup, parse_mode='MarkdownV2')
-            update_player(_user.id, context)
+            update_player(id, context)
         except BadRequest:  # Not edit to be done
             pass
 
     else:  # Main
         logger.info("{} requested the interface".format(update.effective_user.first_name))
 
-        stats = get_user_stats(_user.id)
+        stats = get_user_stats(id)
         choices = []
         for item, attrs in stats.items():  # e.g., "contacts": {"unlock_at", ...}
             if "unlock_at" in attrs and stats[item]["unlocked"]:
                 choices.append(InlineKeyboardButton(item.capitalize(), callback_data="{}x".format(stats[item]["id"])))
 
         if choices:
-            message = "*🧮 Interface 🧮*\n\nSelect what you would like to bargain:"
+            message = "*🧮 Interface 🧮*\n\n"
+            message += get_quantities(id)
+            message += "\n\nSelect what you would like to bargain:"
             reply_markup = InlineKeyboardMarkup([choices])
         else:
             message = "*Interface*\n\nYou don't have enough messages for now\.\.\."
@@ -312,7 +316,7 @@ def handler_interface(update: Update, context: CallbackContext) -> None:
             update.message.reply_text(message, reply_markup=reply_markup, parse_mode='MarkdownV2')
 
 
-def get_user_cooldown_and_notify(id: int, context: CallbackContext) -> bool:
+def update_cooldown_and_notify(id: int, context: CallbackContext) -> bool:
     retryafter = user_cache[id]["cooldown"]["retryafter"]
     if retryafter:
         if not user_cache[id]["cooldown"]["informed"]:
@@ -322,7 +326,7 @@ def get_user_cooldown_and_notify(id: int, context: CallbackContext) -> bool:
         return False
 
 
-def update_cooldown(id: int, context: CallbackContext, COUNTER_LIMIT=100) -> None:
+def set_cooldown(id: int, COUNTER_LIMIT=100) -> None:
     if user_cache[id]["cooldown"]["counter"] >= COUNTER_LIMIT:
         user_cache[id]["cooldown"]["retryafter"] = 3
         user_cache[id]["cooldown"]["counter"] = 0
@@ -345,7 +349,7 @@ def handler_stop(update: Update, context: CallbackContext) -> None:
     update.message.reply_text('Game stopped, account deleted.')  # TODO
 
 
-def update_unlocks(id: int, context: CallbackContext) -> None:
+def set_unlocks(id: int) -> None:
     user, _ = get_or_create_user(id)
     stats = get_user_stats(id)
 
@@ -363,12 +367,9 @@ def update_unlocks(id: int, context: CallbackContext) -> None:
                 user_cache[id]["achievements"].append(ACHIEVEMENTS_ID[item]["unlocked"]["id"])
 
 
-def update_pinned_message(id: int, context: CallbackContext) -> None:
+def get_quantities(id: int) -> str:
     user, _ = get_or_create_user(id)
-    if get_user_cooldown_and_notify(id, context):
-        return
-
-    message = "– 💬 Messages: {}".format(get_si(user.messages))
+    message = "\– 💬 Messages: {}".format(get_si(user.messages))
     if user.contacts_state:
         message += "\n– 📇 Contacts: {}".format(get_si(user.contacts))
     if user.groups_state:
@@ -377,6 +378,16 @@ def update_pinned_message(id: int, context: CallbackContext) -> None:
         message += "\n– 📰 Channels: {}".format(get_si(user.channels))
     if user.supergroups_state:
         message += "\n– 👥 Supergroups: {}".format(get_si(user.supergroups))
+
+    return message
+
+
+def update_pinned_message(id: int, context: CallbackContext) -> None:
+    user, _ = get_or_create_user(id)
+    if update_cooldown_and_notify(id, context):
+        return
+
+    message = get_quantities(id)
 
     try:
         context.bot.edit_message_text(message, id, user.pinned_message)
@@ -387,7 +398,7 @@ def update_pinned_message(id: int, context: CallbackContext) -> None:
         context.bot.send_message(id, "Oops\! It seems like I did not find the pinned message\. Could you use /new_game again, please\?", parse_mode='MarkdownV2')
 
 
-def get_user_achievements(id: int):
+def get_user_achievements(id: int) -> list:
     user, _ = get_or_create_user(id)
     return [int(num) for num in user.achievements.split(",") if num]
 
@@ -447,8 +458,8 @@ def handler_achievements(update: Update, context: CallbackContext) -> None:
 
 
 def update_player(id: int, context: CallbackContext) -> None:
-    update_cooldown(id, context)
-    update_unlocks(id, context)
+    set_cooldown(id)
+    set_unlocks(id)
     update_pinned_message(id, context)
     update_achievements(id, context)
 
@@ -456,7 +467,7 @@ def update_player(id: int, context: CallbackContext) -> None:
 @send_typing_action
 def handler_answer(update: Update, context: CallbackContext) -> None:
     id = update.effective_user.id
-    if get_user_cooldown_and_notify(id, context):
+    if update_cooldown_and_notify(id, context):
         return
 
     try:
@@ -538,7 +549,17 @@ def update_job(id: int, context: CallbackContext) -> None:
         remove_job_if_exists(str(id), context)
         context.job_queue.run_repeating(update_messages_and_contacts_from_job, TIME_INTERVAL, context=id, name=str(id))
     except (IndexError, ValueError):
-        pass
+        return
+
+
+def start_all_jobs(dispatcher) -> None:
+    for user in Players.select():
+        id = user.id
+        try:
+            remove_job_if_exists(str(id), dispatcher)
+            dispatcher.job_queue.run_repeating(update_messages_and_contacts_from_job, TIME_INTERVAL, context=id, name=str(id))
+        except (IndexError, ValueError):
+            pass
 
 
 def main() -> None:
@@ -556,8 +577,7 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler(["stop", "end", "end_game"], handler_stop))
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handler_answer))
 
-    # Jobs go here
-    # TODO
+    start_all_jobs(dispatcher)
 
     # Start the Bot
     updater.start_polling()
