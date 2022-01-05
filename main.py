@@ -121,7 +121,7 @@ def get_user_stats(id: int) -> dict:
 def handler_debug(update: Update, context: CallbackContext) -> None:
     id = update.effective_user.id
     if id == ADMIN_CHAT:
-        user = get_or_create_user(id)
+        user, _ = get_or_create_user(id)
         user.messages += 10_000_000_000
         user.save()
 
