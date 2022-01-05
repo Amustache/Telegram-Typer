@@ -552,6 +552,16 @@ def update_job(id: int, context: CallbackContext) -> None:
         return
 
 
+def start_all_jobs(dispatcher) -> None:
+    for user in Players.select():
+        id = user.id
+        try:
+            remove_job_if_exists(str(id), dispatcher)
+            dispatcher.job_queue.run_repeating(update_messages_and_contacts_from_job, TIME_INTERVAL, context=id, name=str(id))
+        except (IndexError, ValueError):
+            pass
+
+
 def main() -> None:
     updater = Updater(BOT_TOKEN)
     dispatcher = updater.dispatcher
@@ -567,8 +577,7 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler(["stop", "end", "end_game"], handler_stop))
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handler_answer))
 
-    # Jobs go here
-    # TODO
+    start_all_jobs(dispatcher)
 
     # Start the Bot
     updater.start_polling()
