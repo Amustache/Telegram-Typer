@@ -142,6 +142,7 @@ def handler_stats(update: Update, context: CallbackContext) -> None:
             message += "– {} current {}\.\n".format(get_si(attrs["quantity"]), item)
             message += "– {} {} in total\.\n".format(get_si(attrs["total"]), item)
             for currency, quantity in attrs["gain"].items():
+                print(attrs["quantity"] * quantity)
                 message += "– Add {} {} per second\.\n".format(str(attrs["quantity"] * quantity).replace(".", "\.").replace("-", "–"), currency)
             message += "\n"
 
