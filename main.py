@@ -313,9 +313,10 @@ def handler_interface(update: Update, context: CallbackContext) -> None:
 
 
 def get_user_cooldown_and_notify(id: int, context: CallbackContext) -> bool:
-    if user_cache[id]["cooldown"]["retryafter"]:
+    retryafter = user_cache[id]["cooldown"]["retryafter"]
+    if retryafter:
         if not user_cache[id]["cooldown"]["informed"]:
-            context.bot.send_message(id, "Oops! I have been a bit spammy...\nI have to wait about {} before we can play again!".format(user_cache[id]["cooldown"]["retryafter"]))
+            context.bot.send_message(id, "Oops! I have been a bit spammy...\nI have to wait about {} second{} before we can play again!".format(retryafter, "s" if retryafter > 1 else ""))
         return True
     else:
         return False
@@ -380,7 +381,8 @@ def update_pinned_message(id: int, context: CallbackContext) -> None:
     try:
         context.bot.edit_message_text(message, id, user.pinned_message)
     except RetryAfter as e:
-        user_cache[id]["cooldown"]["retryafter"] = e.retryafter
+        retryafter = int(e.split("in ")[1].split(".0")[0])
+        user_cache[id]["cooldown"]["retryafter"] = retryafter
     except BadRequest:  # Edit problem
         context.bot.send_message(id, "Oops\! It seems like I did not find the pinned message\. Could you use /new_game again, please\?", parse_mode='MarkdownV2')
 
@@ -464,7 +466,8 @@ def handler_answer(update: Update, context: CallbackContext) -> None:
             user_cache[update.effective_user.id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["loutres"]["id"])
         user_cache[id]["cooldown"]["counter"] += 1
     except RetryAfter as e:
-        user_cache[id]["cooldown"]["retryafter"] = e.retryafter
+        retryafter = int(e.split("in ")[1].split(".0")[0])
+        user_cache[id]["cooldown"]["retryafter"] = retryafter
 
 
 def update_messages_and_contacts_from_job(context: CallbackContext) -> None:
