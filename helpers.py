@@ -30,6 +30,8 @@ def get_si(number, type="'", size=3):
         return "{:.2f}".format(int(number / 10 ** (exp * size))).rstrip('0').rstrip('.') + "{}".format(suf[exp])
     elif type == "'":
         return "{:,}".format(int(number)).replace(",", "'")
+    elif type == "f":
+        return "{:,.2f}".format(number).replace(",", "'").replace(".", "\.")
     else:
         return number
 
