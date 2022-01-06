@@ -8,7 +8,7 @@ from achievements import ACHIEVEMENTS, ACHIEVEMENTS_ID, MAX_ACHIEVEMENTS
 from collections import defaultdict, Counter
 from datetime import datetime
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ForceReply, ChatAction
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ForceReply, ChatAction, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, Filters, CallbackContext
 from telegram.error import BadRequest, RetryAfter
 from helpers import get_si, send_typing_action, power_10
@@ -28,7 +28,8 @@ main_db = SqliteDatabase("./database.db")
 RESALE_PERCENTAGE = 0.77
 TIME_INTERVAL = 1
 
-user_cache = defaultdict(lambda: {"from_chat": 0, "achievements": [], "cooldown": {"informed": False, "retryafter": 0, "counter": 0}})
+user_cache = defaultdict(
+    lambda: {"from_chat": 0, "achievements": [], "cooldown": {"informed": False, "retryafter": 0, "counter": 0}})
 
 
 class Players(Model):
@@ -138,7 +139,8 @@ def handler_stats(update: Update, context: CallbackContext) -> None:
     logger.info("{} requested the stats".format(update.effective_user.first_name))
 
     stats = get_user_stats(update.effective_user.id)
-    message = "*📊 Stats 📊*\n_Stats of {} as of {}\._\n\n".format(update.effective_user.first_name, datetime.now().strftime("%B %d, %Y at %H:%M GMT\+1"))
+    message = "*📊 Stats 📊*\n_Stats of {} as of {}\._\n\n".format(update.effective_user.first_name,
+                                                                   datetime.now().strftime("%B %d, %Y at %H:%M GMT\+1"))
 
     user_achievements = get_user_achievements(update.effective_user.id)
     medals = Counter([medal for id, (medal, _, _) in sorted(ACHIEVEMENTS.items()) if id in user_achievements])
@@ -189,13 +191,15 @@ def handler_new(update: Update, context: CallbackContext) -> None:
 
         update.message.reply_text("❕ You're ready to play!")
 
-        update.message.reply_text("Use /new_game to start a new game, or to reset a blocked counter.\nUse /interface to show the interface to buy/sell things.\nUse /achievements to show your achievements.\nUse /stats to get your stats to share with your friends.\nFinally, use /end to stop the game and delete your account.")
+        update.message.reply_text(
+            "Use /new_game to start a new game, or to reset a blocked counter.\nUse /interface to show the interface to buy/sell things.\nUse /achievements to show your achievements.\nUse /stats to get your stats to share with your friends.\nFinally, use /end to stop the game and delete your account.")
 
         update.message.reply_text(
             "Now, I am going to pin your counter to this conversation, so that you can see your progress!")
 
     sleep(1)  # ... Fnck you.
-    counter = update.message.reply_text("Send a text (not a command!) to the bot to see this message update.\n(If the pinned message does not update, please do /new_game again.)")
+    counter = update.message.reply_text(
+        "Send a text (not a command!) to the bot to see this message update.\n(If the pinned message does not update, please do /new_game again.)")
     user.pinned_message = counter.message_id
     user.save()
     try:
@@ -249,12 +253,14 @@ def handler_interface(update: Update, context: CallbackContext) -> None:
                         if 10 <= stats[item]["quantity"]:
                             ach = power_10(stats[item]["quantity"])
                             while ach >= 10:
-                                user_cache[update.effective_user.id]["achievements"].append(ACHIEVEMENTS_ID[item]["quantity{}".format(ach)]["id"])
+                                user_cache[update.effective_user.id]["achievements"].append(
+                                    ACHIEVEMENTS_ID[item]["quantity{}".format(ach)]["id"])
                                 ach //= 10
                         if 10 <= stats[item]["total"]:
                             ach = power_10(stats[item]["total"])
                             while ach >= 10:
-                                user_cache[update.effective_user.id]["achievements"].append(ACHIEVEMENTS_ID[item]["total{}".format(ach)]["id"])
+                                user_cache[update.effective_user.id]["achievements"].append(
+                                    ACHIEVEMENTS_ID[item]["total{}".format(ach)]["id"])
                                 ach //= 10
                     elif data[1] == "s":  # Sell
                         if data[2:] == "1":
@@ -286,17 +292,23 @@ def handler_interface(update: Update, context: CallbackContext) -> None:
                     for currency, quantity in buy_price.items():
                         can_buy = min(can_buy, stats[currency]["quantity"] // quantity)
                     if can_buy >= 1:
-                        buy.append(InlineKeyboardButton("📈 Join 1 {}".format(item), callback_data="{}b1".format(attrs["id"])))
+                        buy.append(
+                            InlineKeyboardButton("📈 Join 1 {}".format(item), callback_data="{}b1".format(attrs["id"])))
                         if can_buy >= 10:
-                            buy.append(InlineKeyboardButton("📈 Join 10 {}".format(item), callback_data="{}b10".format(attrs["id"])))
-                        buy.append(InlineKeyboardButton("📈 Join Max {}".format(item), callback_data="{}bmax".format(attrs["id"])))
+                            buy.append(InlineKeyboardButton("📈 Join 10 {}".format(item),
+                                                            callback_data="{}b10".format(attrs["id"])))
+                        buy.append(InlineKeyboardButton("📈 Join Max {}".format(item),
+                                                        callback_data="{}bmax".format(attrs["id"])))
 
                     sell = []
                     if stats[item]["quantity"] >= 1:
-                        sell.append(InlineKeyboardButton("📉 Leave 1 {}".format(item), callback_data="{}s1".format(attrs["id"])))
+                        sell.append(InlineKeyboardButton("📉 Leave 1 {}".format(item),
+                                                         callback_data="{}s1".format(attrs["id"])))
                         if stats[item]["quantity"] >= 10:
-                            sell.append(InlineKeyboardButton("📉 Leave 10 {}".format(item), callback_data="{}s10".format(attrs["id"])))
-                        sell.append(InlineKeyboardButton("📉 Leave All {}".format(item), callback_data="{}smax".format(attrs["id"])))
+                            sell.append(InlineKeyboardButton("📉 Leave 10 {}".format(item),
+                                                             callback_data="{}s10".format(attrs["id"])))
+                        sell.append(InlineKeyboardButton("📉 Leave All {}".format(item),
+                                                         callback_data="{}smax".format(attrs["id"])))
 
                     break
 
@@ -337,7 +349,9 @@ def update_cooldown_and_notify(id: int, context: CallbackContext) -> bool:
     retryafter = user_cache[id]["cooldown"]["retryafter"]
     if retryafter:
         if not user_cache[id]["cooldown"]["informed"]:
-            context.bot.send_message(id, "Oops! I have been a bit spammy...\nI have to wait about {} second{} before we can play again!".format(retryafter, "s" if retryafter > 1 else ""))
+            context.bot.send_message(id,
+                                     "Oops! I have been a bit spammy...\nI have to wait about {} second{} before we can play again!".format(
+                                         retryafter, "s" if retryafter > 1 else ""))
         return True
     else:
         return False
@@ -412,7 +426,9 @@ def update_pinned_message(id: int, context: CallbackContext) -> None:
         retryafter = int(str(e).split("in ")[1].split(".0")[0])
         user_cache[id]["cooldown"]["retryafter"] = retryafter
     except BadRequest:  # Edit problem
-        context.bot.send_message(id, "Oops\! It seems like I did not find the pinned message\. Could you use /new_game again, please\?", parse_mode='MarkdownV2')
+        context.bot.send_message(id,
+                                 "Oops\! It seems like I did not find the pinned message\. Could you use /new_game again, please\?",
+                                 parse_mode='MarkdownV2')
 
 
 def get_user_achievements(id: int) -> list:
@@ -488,15 +504,20 @@ def handler_answer(update: Update, context: CallbackContext) -> None:
         return
 
     try:
-        if not "message" in update.message.text:
-            update.message.reply_text(update.message.text)  # TODO
-            if update.message.text == "J'aime les loutres":
-                user_cache[update.effective_user.id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["loutres"]["id"])
+        update.message.reply_text(update.message.text)  # TODO
+        if update.message.text == "J'aime les loutres":
+            user_cache[update.effective_user.id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["loutres"]["id"])
         user_cache[update.effective_user.id]["from_chat"] += 2
         user_cache[id]["cooldown"]["counter"] += 1
     except RetryAfter as e:
         retryafter = int(e.split("in ")[1].split(".0")[0])
         user_cache[id]["cooldown"]["retryafter"] = retryafter
+
+
+def handler_quickmode(update: Update, context: CallbackContext) -> None:
+    kb = [[KeyboardButton('Blablabla')], ]
+    kb_markup = ReplyKeyboardMarkup(kb)
+    update.message.reply_text("Simply press the big keyboard button to use quickmode!", reply_markup=kb_markup)
 
 
 def update_messages_and_contacts_from_job(context: CallbackContext) -> None:
@@ -575,7 +596,8 @@ def start_all_jobs(dispatcher) -> None:
         id = user.id
         try:
             remove_job_if_exists(str(id), dispatcher)
-            dispatcher.job_queue.run_repeating(update_messages_and_contacts_from_job, TIME_INTERVAL, context=id, name=str(id))
+            dispatcher.job_queue.run_repeating(update_messages_and_contacts_from_job, TIME_INTERVAL, context=id,
+                                               name=str(id))
         except (IndexError, ValueError):
             pass
 
@@ -595,7 +617,7 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler(["stats", "stat"], handler_stats))
     dispatcher.add_handler(CommandHandler(["stop", "end", "end_game"], handler_stop))
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handler_answer))
-    dispatcher.add_handler(CommandHandler("message", handler_answer))
+    dispatcher.add_handler(CommandHandler("quickmode", handler_quickmode))
 
     start_all_jobs(dispatcher)
 
