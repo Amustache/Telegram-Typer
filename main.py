@@ -430,8 +430,9 @@ def update_pinned_message(id: int, context: CallbackContext) -> None:
         user_cache[id]["cooldown"]["retryafter"] = retryafter
     except BadRequest:  # Edit problem
         context.bot.send_message(id,
-                                 "Oops\! It seems like I did not find the pinned message\. Could you use /new_game again, please\?",
+                                 "Oops\! It seems like I did not find the pinned message\. Could you use /new\_game again, please\?",
                                  parse_mode='MarkdownV2')
+        remove_job_if_exists(str(id), context)
 
 
 def get_user_achievements(id: int) -> list:
