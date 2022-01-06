@@ -49,4 +49,4 @@ def send_typing_action(func):
 
 
 def power_10(number: int) -> int:
-    return 10 ** (len(str(int(number))) - 1)
+    return min(10 ** (len(str(int(number))) - 1), 1_000_000)
