@@ -118,6 +118,14 @@ def get_user_stats(id: int) -> dict:
     }
 
 
+def handler_notify(update: Update, context: CallbackContext) -> None:
+    reply_keyboard = [["Yes", "Cancel"]]
+
+
+def handler_notify_cancel(update: Update, context: CallbackContext) -> None:
+    pass
+
+
 def handler_debug(update: Update, context: CallbackContext) -> None:
     id = update.effective_user.id
     if id == ADMIN_CHAT:

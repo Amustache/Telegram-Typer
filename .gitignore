@@ -1,5 +1,6 @@
 secret.py
 *.db
+*.html
 
 # Created by https://www.toptal.com/developers/gitignore/api/windows,macos,linux,pycharm+all,venv,python
 # Edit at https://www.toptal.com/developers/gitignore?templates=windows,macos,linux,pycharm+all,venv,python

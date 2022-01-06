@@ -10,18 +10,18 @@ def get_si(number, type="'", size=3):
     if type == "s":
         suf = {
             0: "",
-            1: " k",
-            2: " M",
-            3: " G",
-            4: " T",
-            5: " P",
-            6: " E",
-            7: " Z",
-            8: " Y",
-            9: " A",
-            10: " AA",
-            11: " AAA",
-            12: " stop",
+            1: "k",
+            2: "M",
+            3: "G",
+            4: "T",
+            5: "P",
+            6: "E",
+            7: "Z",
+            8: "Y",
+            9: "A",
+            10: "AA",
+            11: "AAA",
+            12: "stop",
         }
         exp = 0
         while number // 10 ** (exp * size):
