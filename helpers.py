@@ -42,7 +42,7 @@ def send_typing_action(func):
     @wraps(func)
     def command_func(update, context, *args, **kwargs):
         context.bot.send_chat_action(chat_id=update.effective_message.chat_id, action=ChatAction.TYPING)
-        sleep(len(update.effective_message.text) // 20)  # This is based on my max WPM hehe.
+        sleep(len(update.message.text) // 20)  # This is based on my max WPM hehe.
         return func(update, context, *args, **kwargs)
 
     return command_func
