@@ -487,10 +487,11 @@ def handler_answer(update: Update, context: CallbackContext) -> None:
         return
 
     try:
-        update.message.reply_text(update.message.text)  # TODO
+        if not "message" in update.message.text:
+            update.message.reply_text(update.message.text)  # TODO
+            if update.message.text == "J'aime les loutres":
+                user_cache[update.effective_user.id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["loutres"]["id"])
         user_cache[update.effective_user.id]["from_chat"] += 2
-        if update.message.text == "J'aime les loutres":
-            user_cache[update.effective_user.id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["loutres"]["id"])
         user_cache[id]["cooldown"]["counter"] += 1
     except RetryAfter as e:
         retryafter = int(e.split("in ")[1].split(".0")[0])
@@ -593,6 +594,7 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler(["stats", "stat"], handler_stats))
     dispatcher.add_handler(CommandHandler(["stop", "end", "end_game"], handler_stop))
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handler_answer))
+    dispatcher.add_handler(CommandHandler("message", handler_answer))
 
     start_all_jobs(dispatcher)
 
