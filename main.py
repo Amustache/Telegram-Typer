@@ -246,12 +246,12 @@ def handler_interface(update: Update, context: CallbackContext) -> None:
                         user.save()
                         stats = get_user_stats(id)
 
-                        if 10 <= stats[item]["quantity"] <= 1_000_000:
+                        if 10 <= stats[item]["quantity"]:
                             ach = power_10(stats[item]["quantity"])
                             while ach >= 10:
                                 user_cache[update.effective_user.id]["achievements"].append(ACHIEVEMENTS_ID[item]["quantity{}".format(ach)]["id"])
                                 ach //= 10
-                        if 10 <= stats[item]["total"] <= 1_000_000:
+                        if 10 <= stats[item]["total"]:
                             ach = power_10(stats[item]["total"])
                             while ach >= 10:
                                 user_cache[update.effective_user.id]["achievements"].append(ACHIEVEMENTS_ID[item]["total{}".format(ach)]["id"])
@@ -333,6 +333,7 @@ def handler_interface(update: Update, context: CallbackContext) -> None:
 
 
 def update_cooldown_and_notify(id: int, context: CallbackContext) -> bool:
+    set_cooldown(id)
     retryafter = user_cache[id]["cooldown"]["retryafter"]
     if retryafter:
         if not user_cache[id]["cooldown"]["informed"]:
@@ -524,25 +525,25 @@ def update_messages_and_contacts_from_job(context: CallbackContext) -> None:
         user.contacts_total += TIME_INTERVAL * contacts_to_add
         user.save()
 
-        if 10 <= user.messages <= 1_000_000:
+        if 10 <= user.messages:
             ach = power_10(user.messages)
             while ach >= 10:
                 user_cache[id]["achievements"].append(
                     ACHIEVEMENTS_ID["messages"]["quantity{}".format(ach)]["id"])
                 ach //= 10
-        if 10 <= user.messages_total <= 1_000_000:
+        if 10 <= user.messages_total:
             ach = power_10(user.messages_total)
             while ach >= 10:
                 user_cache[id]["achievements"].append(
                     ACHIEVEMENTS_ID["messages"]["total{}".format(ach)]["id"])
                 ach //= 10
-        if 10 <= user.contacts <= 1_000_000:
+        if 10 <= user.contacts:
             ach = power_10(user.contacts)
             while ach >= 10:
                 user_cache[id]["achievements"].append(
                     ACHIEVEMENTS_ID["contacts"]["quantity{}".format(ach)]["id"])
                 ach //= 10
-        if 10 <= user.contacts_total <= 1_000_000:
+        if 10 <= user.contacts_total:
             ach = power_10(user.contacts_total)
             while ach >= 10:
                 user_cache[id]["achievements"].append(
