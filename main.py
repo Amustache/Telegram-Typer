@@ -120,7 +120,10 @@ def get_user_stats(id: int) -> dict:
 
 
 def handler_notify(update: Update, context: CallbackContext) -> None:
-    reply_keyboard = [["Yes", "Cancel"]]
+    if update.effective_user.id == ADMIN_CHAT:
+        text_to_send = "🗣 Message from admin 🗣\n{}".format(update.effective_message.text.split(" ", 1)[1])
+        update.message.reply_text(text_to_send)
+        reply_keyboard = [["Yes", "Cancel"]]
 
 
 def handler_notify_cancel(update: Update, context: CallbackContext) -> None:
@@ -438,19 +441,18 @@ def get_user_achievements(id: int) -> list:
 
 def update_achievements(id: int, context: CallbackContext) -> None:
     data = list(set(user_cache[id]["achievements"]))
+    user_achievements = get_user_achievements(id)
+    for achievement in data:
+        if achievement not in user_achievements:
+            user_achievements.append(achievement)
+            medal, title, text = ACHIEVEMENTS[achievement]
+            message = "*{} {} {}*\n_{}_".format(medal, title, medal, text)
+            context.bot.send_message(id, message, parse_mode='MarkdownV2')
 
-    if data:
-        user_achievements = get_user_achievements(id)
-        for achievement in data:
-            if achievement not in user_achievements:
-                medal, title, text = ACHIEVEMENTS[achievement]
-                message = "*{} {} {}*\n_{}_".format(medal, title, medal, text)
-                context.bot.send_message(id, message, parse_mode='MarkdownV2')
-
-        user, _ = get_or_create_user(id)
-        user.achievements = ','.join([str(num) for num in set(user_achievements + data)])
-        user.save()
-        user_cache[id]["achievements"] = []
+    user, _ = get_or_create_user(id)
+    user.achievements = ','.join([str(num) for num in user_achievements])
+    user.save()
+    user_cache[id]["achievements"] = []
 
 
 def handler_achievements(update: Update, context: CallbackContext) -> None:
@@ -618,6 +620,7 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler(["stop", "end", "end_game"], handler_stop))
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handler_answer))
     dispatcher.add_handler(CommandHandler("quickmode", handler_quickmode))
+    dispatcher.add_handler(CommandHandler("notify", handler_notify))
 
     start_all_jobs(dispatcher)
 
