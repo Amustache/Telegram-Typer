@@ -421,7 +421,7 @@ def get_user_achievements(id: int) -> list:
 
 
 def update_achievements(id: int, context: CallbackContext) -> None:
-    data = user_cache[id]["achievements"]
+    data = list(set(user_cache[id]["achievements"]))
 
     if data:
         user_achievements = get_user_achievements(id)
