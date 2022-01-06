@@ -409,7 +409,7 @@ def update_pinned_message(id: int, context: CallbackContext) -> None:
     try:
         context.bot.edit_message_text(message, id, user.pinned_message)
     except RetryAfter as e:
-        retryafter = int(e.split("in ")[1].split(".0")[0])
+        retryafter = int(str(e).split("in ")[1].split(".0")[0])
         user_cache[id]["cooldown"]["retryafter"] = retryafter
     except BadRequest:  # Edit problem
         context.bot.send_message(id, "Oops\! It seems like I did not find the pinned message\. Could you use /new_game again, please\?", parse_mode='MarkdownV2')
