@@ -121,13 +121,13 @@ def get_user_stats(id: int) -> dict:
 
 def handler_notify(update: Update, context: CallbackContext) -> None:
     if update.effective_user.id == ADMIN_CHAT:
-        if update.callback_query:
+        if update.message.reply_to_message:
             logger.info("{} sent a global message.".format(update.effective_user.first_name))
-
+            for player in Players.select():
+                context.bot.send_message(player.id, update.message.reply_to_message.text)
         else:
             text_to_send = "🗣 Message from admin 🗣\n{}".format(update.effective_message.text.split(" ", 1)[1])
-            reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("Yes", callback_data=text_to_send), InlineKeyboardButton("Cancel", callback_data="cancel")]])
-            update.message.reply_text(text_to_send, reply_markup=reply_markup, parse_mode='MarkdownV2')
+            update.message.reply_text("This is a preview:").reply_text(text_to_send).reply_text("Reply /notify to the previous message to send it.")
 
 
 
@@ -634,6 +634,7 @@ def main() -> None:
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handler_answer))
     dispatcher.add_handler(CommandHandler("quickmode", handler_quickmode))
     dispatcher.add_handler(CommandHandler("notify", handler_notify))
+    updater.dispatcher.add_handler(CallbackQueryHandler(handler_notify))
 
     start_all_jobs(dispatcher)
 
