@@ -121,13 +121,14 @@ def get_user_stats(id: int) -> dict:
 
 def handler_notify(update: Update, context: CallbackContext) -> None:
     if update.effective_user.id == ADMIN_CHAT:
-        text_to_send = "🗣 Message from admin 🗣\n{}".format(update.effective_message.text.split(" ", 1)[1])
-        update.message.reply_text(text_to_send)
-        reply_keyboard = [["Yes", "Cancel"]]
+        if update.callback_query:
+            logger.info("{} sent a global message.".format(update.effective_user.first_name))
 
+        else:
+            text_to_send = "🗣 Message from admin 🗣\n{}".format(update.effective_message.text.split(" ", 1)[1])
+            reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("Yes", callback_data=text_to_send), InlineKeyboardButton("Cancel", callback_data="cancel")]])
+            update.message.reply_text(text_to_send, reply_markup=reply_markup, parse_mode='MarkdownV2')
 
-def handler_notify_cancel(update: Update, context: CallbackContext) -> None:
-    pass
 
 
 def handler_debug(update: Update, context: CallbackContext) -> None:
@@ -135,7 +136,9 @@ def handler_debug(update: Update, context: CallbackContext) -> None:
     if id == ADMIN_CHAT:
         user, _ = get_or_create_user(id)
         user.messages += 10_000_000_000
+        user.messages_total += 10_000_000_000
         user.save()
+    update.message.reply_text("Sent 10\_000\_000\_000 messages\.", parse_mode='MarkdownV2')
 
 
 def handler_stats(update: Update, context: CallbackContext) -> None:
@@ -265,6 +268,8 @@ def handler_interface(update: Update, context: CallbackContext) -> None:
                                 user_cache[update.effective_user.id]["achievements"].append(
                                     ACHIEVEMENTS_ID[item]["total{}".format(ach)]["id"])
                                 ach //= 10
+
+                        update_player(id, context)
                     elif data[1] == "s":  # Sell
                         if data[2:] == "1":
                             qt = 1
@@ -278,6 +283,8 @@ def handler_interface(update: Update, context: CallbackContext) -> None:
                         exec("user.{} -= qt".format(item))
                         user.save()
                         stats = get_user_stats(id)
+
+                        update_player(id, context)
 
                     message = "*🧮 Interface 🧮*\n\n*{}*\n".format(item.capitalize())
                     message += "You have {} {}\.\n".format(get_si(stats[item]["quantity"]), item)
@@ -319,7 +326,6 @@ def handler_interface(update: Update, context: CallbackContext) -> None:
 
         try:
             query.edit_message_text(message, reply_markup=reply_markup, parse_mode='MarkdownV2')
-            update_player(id, context)
         except BadRequest:  # Not edit to be done
             pass
 
@@ -373,7 +379,11 @@ def set_cooldown(id: int, COUNTER_LIMIT=100) -> None:
 def handler_stop(update: Update, context: CallbackContext) -> None:
     logger.info("{} deleted their account".format(update.effective_user.first_name))
 
-    Players.delete().where(Players.id == update.effective_user.id).execute()
+    id = update.effective_user.id
+    obj = Players.get(Players.id == id)
+    obj.delete_instance()
+    Players.delete().where(Players.id == id).execute()
+    remove_job_if_exists(str(id), context)
 
     try:
         context.bot.unpin_chat_message(update.message.chat.id)
@@ -426,12 +436,14 @@ def update_pinned_message(id: int, context: CallbackContext) -> None:
     try:
         context.bot.edit_message_text(message, id, user.pinned_message)
     except RetryAfter as e:
+        logger.error(str(e))
         retryafter = int(str(e).split("in ")[1].split(".0")[0])
         user_cache[id]["cooldown"]["retryafter"] = retryafter
-    except BadRequest:  # Edit problem
+    except BadRequest as e:  # Edit problem
         context.bot.send_message(id,
                                  "Oops\! It seems like I did not find the pinned message\. Could you use /new\_game again, please\?",
                                  parse_mode='MarkdownV2')
+        logger.error(str(e))
         remove_job_if_exists(str(id), context)
 
 
@@ -441,19 +453,18 @@ def get_user_achievements(id: int) -> list:
 
 
 def update_achievements(id: int, context: CallbackContext) -> None:
-    data = list(set(user_cache[id]["achievements"]))
+    user, _ = get_or_create_user(id)
     user_achievements = get_user_achievements(id)
+    data = list(set(user_cache[id]["achievements"]))
+    user_cache[id]["achievements"] = []
+    user.achievements = ','.join([str(num) for num in list(set(user_achievements + data))])
+    user.save()
+
     for achievement in data:
         if achievement not in user_achievements:
-            user_achievements.append(achievement)
             medal, title, text = ACHIEVEMENTS[achievement]
             message = "*{} {} {}*\n_{}_".format(medal, title, medal, text)
             context.bot.send_message(id, message, parse_mode='MarkdownV2')
-
-    user, _ = get_or_create_user(id)
-    user.achievements = ','.join([str(num) for num in user_achievements])
-    user.save()
-    user_cache[id]["achievements"] = []
 
 
 def handler_achievements(update: Update, context: CallbackContext) -> None:
@@ -513,6 +524,7 @@ def handler_answer(update: Update, context: CallbackContext) -> None:
         user_cache[update.effective_user.id]["from_chat"] += 2
         user_cache[id]["cooldown"]["counter"] += 1
     except RetryAfter as e:
+        logger.error(str(e))
         retryafter = int(e.split("in ")[1].split(".0")[0])
         user_cache[id]["cooldown"]["retryafter"] = retryafter
 
