@@ -6,8 +6,6 @@ from telegram import ChatAction
 
 
 def get_si(number, type="'", size=3):
-    if number < 1:
-        return "0"
     if type == "s":
         suf = {
             0: "",
