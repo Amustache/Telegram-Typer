@@ -1,0 +1,6 @@
+black
+isort
+peewee
+pre-commit
+pre-commit-hooks
+python-telegram-bot
