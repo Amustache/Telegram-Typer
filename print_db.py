@@ -41,7 +41,14 @@ class Players(Model):
 main_db.connect()
 main_db.create_tables([Players])
 
-headers = str(Players.select()).split("SELECT ")[1].split(" FROM \"players\" AS \"t1\"")[0].replace("\"t1\".", "").replace("\"", "").split(", ")
+headers = (
+    str(Players.select())
+    .split("SELECT ")[1]
+    .split(' FROM "players" AS "t1"')[0]
+    .replace('"t1".', "")
+    .replace('"', "")
+    .split(", ")
+)
 
 values = []
 for player in Players.select():

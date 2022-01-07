@@ -15,7 +15,7 @@ ACHIEVEMENTS_ID = {
             "text": "You started a new game\.",
         },
         "loutres": {
-            "id": 0xff,
+            "id": 0xFF,
             "medal": MEDALS[2],
             "title": "J'aime les Loutres",
             "text": "Tu as exprimé ton amour pour les loutres\!",
@@ -77,19 +77,19 @@ ACHIEVEMENTS_ID = {
             "text": "You had more than 1'000 messages at the same time\!",
         },
         "quantity10000": {
-            "id": 0x0a,
+            "id": 0x0A,
             "medal": MEDALS[4],
             "title": "Grabby",
             "text": "You had more than 10'000 messages at the same time\!",
         },
         "quantity100000": {
-            "id": 0x0b,
+            "id": 0x0B,
             "medal": MEDALS[3],
             "title": "Hoggish",
             "text": "You had more than 100'000 messages at the same time\!",
         },
         "quantity1000000": {
-            "id": 0x0c,
+            "id": 0x0C,
             "medal": MEDALS[3],
             "title": "Desirous",
             "text": "You had more than 1'000'000 messages at the same time\!",
@@ -157,19 +157,19 @@ ACHIEVEMENTS_ID = {
             "text": "You had more than 1'000 Contacts at the same time\!",
         },
         "quantity10000": {
-            "id": 0x2a,
+            "id": 0x2A,
             "medal": MEDALS[4],
             "title": "Faddish",
             "text": "You had more than 10'000 Contacts at the same time\!",
         },
         "quantity100000": {
-            "id": 0x2b,
+            "id": 0x2B,
             "medal": MEDALS[3],
             "title": "Prominent",
             "text": "You had more than 100'000 Contacts at the same time\!",
         },
         "quantity1000000": {
-            "id": 0x2c,
+            "id": 0x2C,
             "medal": MEDALS[3],
             "title": "Famous",
             "text": "You had more than 1'000'000 Contacts at the same time\!",
@@ -237,19 +237,19 @@ ACHIEVEMENTS_ID = {
             "text": "You had more than 1'000 Groups at the same time\!",
         },
         "quantity10000": {
-            "id": 0x4a,
+            "id": 0x4A,
             "medal": MEDALS[4],
             "title": "Pack",
             "text": "You had more than 10'000 Groups at the same time\!",
         },
         "quantity100000": {
-            "id": 0x4b,
+            "id": 0x4B,
             "medal": MEDALS[3],
             "title": "League",
             "text": "You had more than 100'000 Groups at the same time\!",
         },
         "quantity1000000": {
-            "id": 0x4c,
+            "id": 0x4C,
             "medal": MEDALS[3],
             "title": "Gathering",
             "text": "You had more than 1'000'000 Groups at the same time\!",
@@ -317,19 +317,19 @@ ACHIEVEMENTS_ID = {
             "text": "You had more than 1'000 Channels at the same time\!",
         },
         "quantity10000": {
-            "id": 0x6a,
+            "id": 0x6A,
             "medal": MEDALS[4],
             "title": "Cub",
             "text": "You had more than 10'000 Channels at the same time\!",
         },
         "quantity100000": {
-            "id": 0x6b,
+            "id": 0x6B,
             "medal": MEDALS[3],
             "title": "Publicist",
             "text": "You had more than 100'000 Channels at the same time\!",
         },
         "quantity1000000": {
-            "id": 0x6c,
+            "id": 0x6C,
             "medal": MEDALS[3],
             "title": "Scribe",
             "text": "You had more than 1'000'000 Channels at the same time\!",
@@ -397,19 +397,19 @@ ACHIEVEMENTS_ID = {
             "text": "You had more than 1'000 Supergroups at the same time\!",
         },
         "quantity10000": {
-            "id": 0x8a,
+            "id": 0x8A,
             "medal": MEDALS[4],
             "title": "Super Pack",
             "text": "You had more than 10'000 Supergroups at the same time\!",
         },
         "quantity100000": {
-            "id": 0x8b,
+            "id": 0x8B,
             "medal": MEDALS[3],
             "title": "Super League",
             "text": "You had more than 100'000 Supergroups at the same time\!",
         },
         "quantity1000000": {
-            "id": 0x8c,
+            "id": 0x8C,
             "medal": MEDALS[3],
             "title": "Super Gathering",
             "text": "You had more than 1'000'000 Supergroups at the same time\!",
@@ -424,7 +424,15 @@ def reverse_achievements(achievements_id=None):
     data = {}
     for category in achievements_id.values():
         for achievement in category.values():
-            data.update({achievement["id"]: (achievement["medal"], achievement["title"], achievement["text"])})
+            data.update(
+                {
+                    achievement["id"]: (
+                        achievement["medal"],
+                        achievement["title"],
+                        achievement["text"],
+                    )
+                }
+            )
     return data
 
 
