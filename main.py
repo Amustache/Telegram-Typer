@@ -25,7 +25,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Database
-main_db = SqliteDatabase("./database.db")
+main_db = SqliteDatabase("./db/database.db")
 
 RESALE_PERCENTAGE = 0.77
 TIME_INTERVAL = 1
