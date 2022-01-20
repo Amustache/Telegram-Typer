@@ -5,7 +5,7 @@ from datetime import datetime
 from time import sleep
 import logging
 
-from peewee import BigIntegerField, CharField, FloatField, IntegerField, Model, SqliteDatabase
+from peewee import SqliteDatabase
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, Update
 from telegram.error import BadRequest, RetryAfter
 from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler, Filters, MessageHandler, Updater
@@ -22,66 +22,14 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 
-Player = PlayerInstance()
-
 logger = logging.getLogger(__name__)
 
-# Database
-DB = SqliteDatabase(DB_PATH)
+Player = PlayerInstance()
 
+DB = SqliteDatabase(DB_PATH)
 DB.bind([Player.Model])
 DB.connect()
 DB.create_tables([Player.Model])
-
-
-def get_player_stats(player_id: int) -> dict:
-    user, _ = Player.get_or_create(player_id)
-
-    return {
-        "messages": {
-            "quantity": user.messages,
-            "total": user.messages_total,
-        },
-        "contacts": {
-            "id": "c",
-            "unlock_at": {"messages": 10},
-            "unlocked": user.contacts_state,
-            "price": {"messages": 10},
-            "gain": {"messages": 0.02, "contacts": 0.00001},
-            "quantity": user.contacts,
-            "total": user.contacts_total,
-        },
-        "groups": {
-            "id": "g",
-            "unlock_at": {"messages": 100, "contacts": 4},
-            "unlocked": user.groups_state,
-            "price": {"messages": 100, "contacts": 4},
-            "gain": {"messages": 0.2, "contacts": 0.0001},
-            "quantity": user.groups,
-            "total": user.groups_total,
-        },
-        "channels": {
-            "id": "h",
-            "unlock_at": {"messages": 1000, "contacts": 16},
-            "unlocked": user.channels_state,
-            "price": {"messages": 1000, "contacts": 16},
-            "gain": {"messages": 2, "contacts": 0.001},
-            "quantity": user.channels,
-            "total": user.channels_total,
-        },
-        "supergroups": {
-            "id": "s",
-            "unlock_at": {"messages": 10000, "contacts": 256, "groups": 1},
-            "unlocked": user.supergroups_state,
-            "price": {"messages": 10000, "contacts": 256, "groups": 1},
-            "gain": {"messages": 20, "contacts": 0.01},
-            "quantity": user.supergroups,
-            "total": user.supergroups_total,
-        },
-    }
-
-
-
 
 
 def handler_interface(update: Update, context: CallbackContext) -> None:
@@ -350,103 +298,11 @@ def update_achievements(player_id: int, context: CallbackContext) -> None:
             context.bot.send_message(player_id, message, parse_mode="MarkdownV2")
 
 
-
-
-
 def update_player(player_id: int, context: CallbackContext) -> None:
     set_cooldown(player_id)
     set_unlocks(player_id)
     update_pinned_message(player_id, context)
     update_achievements(player_id, context)
-
-
-def update_messages_and_contacts_from_job(context: CallbackContext) -> None:
-    player_id = context.job.context
-    user, _ = Player.get_or_create(player_id)
-    stats = get_player_stats(player_id)
-
-    messages_to_add = 0
-    contacts_to_add = 0
-
-    messages_to_add += Player.cache[player_id]["from_chat"]
-    Player.cache[player_id]["from_chat"] = 0
-
-    for item, attrs in stats.items():
-        if "unlocked" in attrs and stats[item]["unlocked"]:
-            messages_to_add += stats[item]["gain"]["messages"] * stats[item]["quantity"]
-            contacts_to_add += stats[item]["gain"]["contacts"] * stats[item]["quantity"]
-
-    messages_to_add = int(messages_to_add)
-    contacts_to_add = int(contacts_to_add)
-
-    if messages_to_add > 0 or contacts_to_add > 0:
-        user.messages += TIME_INTERVAL * messages_to_add
-        user.messages_total += TIME_INTERVAL * messages_to_add
-        user.contacts += TIME_INTERVAL * contacts_to_add
-        user.contacts_total += TIME_INTERVAL * contacts_to_add
-        user.save()
-
-        if 10 <= user.messages:
-            ach = power_10(user.messages)
-            while ach >= 10:
-                Player.cache[player_id]["achievements"].append(
-                    ACHIEVEMENTS_ID["messages"]["quantity{}".format(ach)]["id"]
-                )
-                ach //= 10
-        if 10 <= user.messages_total:
-            ach = power_10(user.messages_total)
-            while ach >= 10:
-                Player.cache[player_id]["achievements"].append(
-                    ACHIEVEMENTS_ID["messages"]["total{}".format(ach)]["id"]
-                )
-                ach //= 10
-        if 10 <= user.contacts:
-            ach = power_10(user.contacts)
-            while ach >= 10:
-                Player.cache[player_id]["achievements"].append(
-                    ACHIEVEMENTS_ID["contacts"]["quantity{}".format(ach)]["id"]
-                )
-                ach //= 10
-        if 10 <= user.contacts_total:
-            ach = power_10(user.contacts_total)
-            while ach >= 10:
-                Player.cache[player_id]["achievements"].append(
-                    ACHIEVEMENTS_ID["contacts"]["total{}".format(ach)]["id"]
-                )
-                ach //= 10
-
-        update_player(player_id, context)
-
-
-def remove_job_if_exists(name: str, context: CallbackContext) -> bool:
-    current_jobs = context.job_queue.get_jobs_by_name(name)
-    if not current_jobs:
-        return False
-    for job in current_jobs:
-        job.schedule_removal()
-    return True
-
-
-def update_job(player_id: int, context: CallbackContext) -> None:
-    try:
-        remove_job_if_exists(str(player_id), context)
-        context.job_queue.run_repeating(
-            update_messages_and_contacts_from_job, TIME_INTERVAL, context=player_id, name=str(player_id)
-        )
-    except (IndexError, ValueError):
-        return
-
-
-def start_all_jobs(dispatcher) -> None:
-    for user in Player.Model.select():
-        id = user.id
-        try:
-            remove_job_if_exists(str(id), dispatcher)
-            dispatcher.job_queue.run_repeating(
-                update_messages_and_contacts_from_job, TIME_INTERVAL, context=id, name=str(id)
-            )
-        except (IndexError, ValueError):
-            pass
 
 
 def main() -> None:

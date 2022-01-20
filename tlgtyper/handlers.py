@@ -20,7 +20,7 @@ class BaseHandlers:
     Base class to add new features in the bot.
     """
 
-    def __init__(self, command_handlers, player_instance=None, logger=None, media_folder=None):
+    def __init__(self, command_handlers, player_instance, logger=None, media_folder=None):
         """
         :param logger: logging.getLogger, when using a logger.
         :param command_handlers: [telegram.ext.CommandHandler], for command handling.
@@ -72,7 +72,7 @@ class BaseHandlers:
 
 
 class PlayerHandlers(BaseHandlers):
-    def __init__(self, player_instance=None, logger=None, media_folder=None):
+    def __init__(self, player_instance, logger=None, media_folder=None):
         command_handlers = [
             CommandHandler(["start"], self.start_bot),
             CommandHandler(["new_game", "new", "reset_game", "reset"], self.new_game),
@@ -89,7 +89,7 @@ class PlayerHandlers(BaseHandlers):
     def start_bot(self, update: Update, context: CallbackContext):
         user = update.effective_user
 
-        with open("./img/typing.gif", "rb") as gif:
+        with open("../img/typing.gif", "rb") as gif:
             update.message.reply_document(gif, caption="👋 Welcome, {}!".format(user.first_name)).reply_text(
                 "Press /new_game to play!")
 
@@ -270,7 +270,7 @@ class PlayerHandlers(BaseHandlers):
 
 
 class AdminHandlers(BaseHandlers):
-    def __init__(self, player_instance=None, logger=None, media_folder=None):
+    def __init__(self, player_instance, logger=None, media_folder=None):
         command_handlers = [
             CommandHandler(["debug", "cheat", "rich"], self.be_rich),
             CommandHandler(["notify"], self.notify_all),
