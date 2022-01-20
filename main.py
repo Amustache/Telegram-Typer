@@ -13,6 +13,7 @@ from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler, 
 
 
 from achievements import ACHIEVEMENTS, ACHIEVEMENTS_ID, MAX_ACHIEVEMENTS
+from parameters import DB_PATH
 from tlgtyper.helpers import get_si, power_10, send_typing_action
 from secret import ADMIN_CHAT, BOT_NAME, BOT_TOKEN
 
@@ -25,7 +26,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Database
-main_db = SqliteDatabase("./db/database.db")
+DB = SqliteDatabase(DB_PATH)
 
 RESALE_PERCENTAGE = 0.77
 TIME_INTERVAL = 1
@@ -68,11 +69,11 @@ class Players(Model):
     achievements = CharField(default="")
 
     class Meta:
-        database = main_db
+        database = DB
 
 
-main_db.connect()
-main_db.create_tables([Players])
+DB.connect()
+DB.create_tables([Players])
 
 
 def get_or_create_user(id: int) -> Players:
