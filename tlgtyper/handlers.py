@@ -60,6 +60,7 @@ class BaseHandlers:
                 )
             except:
                 continue
+        return commands
 
     def get_commands_botfather(self):
         """
@@ -74,6 +75,7 @@ class BaseHandlers:
                 ]
             except:
                 continue
+        return commands
 
 
 class PlayerHandlers(BaseHandlers):
@@ -479,7 +481,7 @@ class AdminHandlers(BaseHandlers):
         self.logger.info("{} cheated.".format(update.effective_user.first_name))
 
     def notify_all(self, update: Update, context: CallbackContext) -> None:
-        if update.effective_user.id == ADMIN_CHAT:  # ADMIN_CHAT:
+        if update.effective_user.id == ADMIN_CHAT:
             if update.message.reply_to_message:
                 for player in self.players_instance.Model.select():
                     context.bot.send_message(player.id, update.message.reply_to_message.text)

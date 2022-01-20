@@ -36,6 +36,14 @@ def main() -> None:
     PlayerHandlers(Players, logger, media_folder="./img").add_commands(dispatcher)
     AdminHandlers(Players, logger).add_commands(dispatcher)
 
+    commands = ""
+    for handler in dispatcher.handlers[0]:
+        try:
+            commands += "{}\n".format("\n".join("{} - {}".format(command, handler.callback.__name__) for command in handler.command))
+        except AttributeError:
+            continue
+    print("{}\nList of commands\n{}\n{}".format("*"*13, commands, "*"*13))
+
     # Jobs
     start_all_jobs(dispatcher, Players)
 
