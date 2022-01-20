@@ -2,3 +2,4 @@ DB_PATH = "./db/database.db"
 RESALE_PERCENTAGE = 0.77
 TIME_INTERVAL = 1
 FACTOR = 1.14_159_265_359
+CAP = int(1e36)

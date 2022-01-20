@@ -27,19 +27,19 @@ def update_job(player_id: int, context: CallbackContext) -> None:
 def start_all_jobs(dispatcher, player_instance) -> None:
     for player in player_instance.Model.select():
         player_id = player.id
-        try:
-            remove_job_if_exists(str(player_id), dispatcher)
-            dispatcher.job_queue.run_repeating(
-                update_messages_and_contacts_from_job, TIME_INTERVAL, context=player_id, name=str(player_id)
-            )
-        except (IndexError, ValueError):
-            pass
+        # try:
+        remove_job_if_exists(str(player_id), dispatcher)
+        dispatcher.job_queue.run_repeating(
+            update_messages_and_contacts_from_job, TIME_INTERVAL, context=(player_id, player_instance), name=str(player_id)
+        )
+        # except (IndexError, ValueError) as e:
+        #     pass
 
 
-def update_messages_and_contacts_from_job(context: CallbackContext, player_instance) -> None:
-    player_id = context.job.context
+def update_messages_and_contacts_from_job(context: CallbackContext) -> None:
+    player_id, player_instance = context.job.context
     player, _ = player_instance.get_or_create(player_id)
-    stats = get_player_stats(player_id)
+    stats = player_instance.get_stats(player_id)
 
     messages_to_add = 0
     contacts_to_add = 0

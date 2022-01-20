@@ -13,7 +13,9 @@ from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler, 
 from tlgtyper.achievements import ACHIEVEMENTS, ACHIEVEMENTS_ID, MAX_ACHIEVEMENTS
 from parameters import DB_PATH, RESALE_PERCENTAGE, TIME_INTERVAL
 from secret import ADMIN_CHAT, BOT_NAME, BOT_TOKEN
+from tlgtyper.cooldown import update_cooldown_and_notify, set_cooldown
 from tlgtyper.helpers import get_si, power_10, send_typing_action
+from tlgtyper.jobs import remove_job_if_exists, start_all_jobs
 from tlgtyper.player import PlayerInstance
 from tlgtyper.handlers import AdminHandlers, PlayerHandlers
 
@@ -35,11 +37,11 @@ DB.create_tables([Player.Model])
 def handler_interface(update: Update, context: CallbackContext) -> None:
     id = update.effective_user.id
     user, _ = Player.get_or_create(id)
-    if update_cooldown_and_notify(id, context):
+    if update_cooldown_and_notify(id, Player, context):
         return
 
     if update.callback_query and update.callback_query.data != "stop":  # Choices
-        stats = get_player_stats(id)
+        stats = Player.get_stats(id)
         query = update.callback_query
         query.answer()
         data = query.data
@@ -64,7 +66,7 @@ def handler_interface(update: Update, context: CallbackContext) -> None:
                         exec("user.{} += qt".format(item))
                         exec("user.{}_total += qt".format(item))
                         user.save()
-                        stats = get_player_stats(id)
+                        stats = Player.get_stats(id)
 
                         if 10 <= stats[item]["quantity"]:
                             ach = power_10(stats[item]["quantity"])
@@ -94,7 +96,7 @@ def handler_interface(update: Update, context: CallbackContext) -> None:
                             exec("user.{}_total += qt * quantity".format(currency))
                         exec("user.{} -= qt".format(item))
                         user.save()
-                        stats = get_player_stats(id)
+                        stats = Player.get_stats(id)
 
                         update_player(id, context)
 
@@ -169,7 +171,7 @@ def handler_interface(update: Update, context: CallbackContext) -> None:
     else:  # Main
         logger.info("{} requested the interface".format(update.effective_user.first_name))
 
-        stats = get_player_stats(id)
+        stats = Player.get_stats(id)
         choices = []
         for item, attrs in stats.items():  # e.g., "contacts": {"unlock_at", ...}
             if "unlock_at" in attrs and stats[item]["unlocked"]:
@@ -196,35 +198,9 @@ def handler_interface(update: Update, context: CallbackContext) -> None:
             update.message.reply_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
 
 
-def update_cooldown_and_notify(player_id: int, context: CallbackContext) -> bool:
-    set_cooldown(player_id)
-    retryafter = Player.cache[player_id]["cooldown"]["retryafter"]
-    if retryafter:
-        if not Player.cache[player_id]["cooldown"]["informed"]:
-            context.bot.send_message(
-                player_id,
-                "Oops! I have been a bit spammy...\nI have to wait about {} second{} before we can play again!".format(
-                    retryafter, "s" if retryafter > 1 else ""
-                ),
-            )
-        return True
-    else:
-        return False
-
-
-def set_cooldown(player_id: int, COUNTER_LIMIT=100) -> None:
-    if Player.cache[player_id]["cooldown"]["counter"] >= COUNTER_LIMIT:
-        Player.cache[player_id]["cooldown"]["retryafter"] = 3
-        Player.cache[player_id]["cooldown"]["counter"] = 0
-    if Player.cache[player_id]["cooldown"]["retryafter"]:
-        Player.cache[player_id]["cooldown"]["retryafter"] -= 1
-    if Player.cache[player_id]["cooldown"]["retryafter"] < 0:
-        Player.cache[player_id]["cooldown"]["retryafter"] = 0
-
-
 def set_unlocks(player_id: int) -> None:
     user, _ = Player.get_or_create(player_id)
-    stats = get_player_stats(player_id)
+    stats = Player.get_stats(player_id)
 
     for item, attrs in stats.items():  # e.g., "contacts": {"unlock_at", ...}
         if "unlock_at" in attrs and not stats[item]["unlocked"]:
@@ -257,7 +233,7 @@ def get_quantities(player_id: int) -> str:
 
 def update_pinned_message(player_id: int, context: CallbackContext) -> None:
     user, _ = Player.get_or_create(player_id)
-    if update_cooldown_and_notify(player_id, context):
+    if update_cooldown_and_notify(player_id, Player, context):
         return
 
     message = get_quantities(player_id)
@@ -266,8 +242,8 @@ def update_pinned_message(player_id: int, context: CallbackContext) -> None:
         context.bot.edit_message_text(message, player_id, user.pinned_message)
     except RetryAfter as e:
         logger.error(str(e))
-        retryafter = int(str(e).split("in ")[1].split(".0")[0])
-        Player.cache[player_id]["cooldown"]["retryafter"] = retryafter
+        retry_after = int(str(e).split("in ")[1].split(".0")[0])
+        Player.cache[player_id]["cooldown"]["retry_after"] = retryafter
     except BadRequest as e:  # Edit problem
         context.bot.send_message(
             player_id,
@@ -278,14 +254,9 @@ def update_pinned_message(player_id: int, context: CallbackContext) -> None:
         remove_job_if_exists(str(player_id), context)
 
 
-def get_player_achievements(player_id: int) -> list:
-    user, _ = Player.get_or_create(player_id)
-    return [int(num) for num in user.achievements.split(",") if num]
-
-
 def update_achievements(player_id: int, context: CallbackContext) -> None:
     user, _ = Player.get_or_create(player_id)
-    user_achievements = get_player_achievements(player_id)
+    user_achievements = Player.get_achievements(player_id)
     data = list(set(Player.cache[player_id]["achievements"]))
     Player.cache[player_id]["achievements"] = []
     user.achievements = ",".join([str(num) for num in list(set(user_achievements + data))])
@@ -299,7 +270,7 @@ def update_achievements(player_id: int, context: CallbackContext) -> None:
 
 
 def update_player(player_id: int, context: CallbackContext) -> None:
-    set_cooldown(player_id)
+    set_cooldown(player_id, Player)
     set_unlocks(player_id)
     update_pinned_message(player_id, context)
     update_achievements(player_id, context)
@@ -318,7 +289,7 @@ def main() -> None:
     )
     updater.dispatcher.add_handler(CallbackQueryHandler(handler_interface))
 
-    start_all_jobs(dispatcher)
+    start_all_jobs(dispatcher, Player)
 
     # Start the Bot
     updater.start_polling()

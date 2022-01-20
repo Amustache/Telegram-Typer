@@ -50,12 +50,18 @@ class PlayerInstance:
         player, _ = self.get_or_create(player_id)
 
         result = {
-            item: {
-                "unlocked": eval("player.{}_state".format(item)),
-                "quantity": eval("player.{}".format(item)),
-                "total": eval("player.{}_total".format(item)),
-            }
-            for item in ITEMS.keys()
+            item: {**attrs, **{
+                "unlocked": 1,  # eval("player.{}_state".format(item)),
+                "quantity": 0,  # eval("player.{}".format(item)),
+                "total": 0,  # eval("player.{}_total".format(item)),
+            }}
+            for item, attrs in ITEMS.items()
         }
 
+        del result["messages"]["unlock_at"]  # TODO: ugly
+
         return result
+
+    def get_achievements(self, player_id):
+        user, _ = self.get_or_create(player_id)
+        return [int(num) for num in user.achievements.split(",") if num]

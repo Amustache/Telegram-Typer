@@ -11,9 +11,10 @@ from telegram.ext import CommandHandler, CallbackContext, CallbackQueryHandler, 
 
 from secret import ADMIN_CHAT, BOT_NAME
 from tlgtyper.achievements import ACHIEVEMENTS_ID, ACHIEVEMENTS, MAX_ACHIEVEMENTS
+from tlgtyper.cooldown import update_cooldown_and_notify
 from tlgtyper.helpers import send_typing_action, get_si
+from tlgtyper.jobs import update_job, remove_job_if_exists
 from tlgtyper.texts import HELP_COMMANDS
-
 
 class BaseHandlers:
     """
@@ -131,14 +132,14 @@ class PlayerHandlers(BaseHandlers):
             pass
 
         context.bot.pin_chat_message(update.message.chat.id, counter.message_id)
-        update_job(_user.id, context)
+        update_job(player_id, context)
 
-    @send_typing_action
+    #@send_typing_action
     def answer(self, update: Update, context: CallbackContext):
         user = update.effective_user
         player_id = user.id
 
-        if update_cooldown_and_notify(player_id, context):
+        if update_cooldown_and_notify(player_id, self.player_instance, context):
             return
 
         try:
@@ -188,12 +189,12 @@ class PlayerHandlers(BaseHandlers):
         user = update.effective_user
         player_id = user.id
 
-        stats = get_player_stats(player_id)
+        stats = self.player_instance.get_stats(player_id)
         message = "*📊 Stats 📊*\n_Stats of {} as of {}\._\n\n".format(
             update.effective_user.first_name, datetime.now().strftime("%B %d, %Y at %H:%M GMT\+1")
         )
 
-        user_achievements = get_player_achievements(player_id)
+        user_achievements = self.player_instance.get_achievements(player_id)
         medals = Counter(
             [medal for achievement_id, (medal, _, _) in sorted(ACHIEVEMENTS.items()) if
              achievement_id in user_achievements]
@@ -232,7 +233,7 @@ class PlayerHandlers(BaseHandlers):
         user = update.effective_user
         player_id = user.id
 
-        user_achievements = get_player_achievements(player_id)
+        user_achievements = self.player_instance.get_achievements(player_id)
         question = "❔"
 
         if context.args:
