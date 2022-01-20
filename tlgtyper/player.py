@@ -57,7 +57,6 @@ class Players:
     def get_stats(self, player_id):
         player, _ = self.get_or_create(player_id)
         scope = locals()
-        print(scope)
 
         result = {
             item: {
@@ -117,7 +116,7 @@ class Players:
         except BadRequest as e:  # Edit problem
             context.bot.send_message(
                 player_id,
-                "Oops\! It seems like I did not find the pinned message\. Could you use /new\_game again, please\?",
+                "Oops\! It seems like I did not find the pinned message\. Could you use /reset, please\?",
                 parse_mode="MarkdownV2",
             )
             # self.logger.error(str(e))

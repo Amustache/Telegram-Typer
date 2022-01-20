@@ -15,13 +15,13 @@ def remove_job_if_exists(name: str, context: CallbackContext) -> bool:
     return True
 
 
-def update_job(player_id: int, context: CallbackContext) -> None:
+def update_job(player_id: int, context: CallbackContext, players_instance) -> None:
     try:
         remove_job_if_exists(str(player_id), context)
         context.job_queue.run_repeating(
             update_messages_and_contacts_from_job,
             TIME_INTERVAL,
-            context=player_id,
+            context=(player_id, players_instance),
             name=str(player_id),
         )
     except (IndexError, ValueError):

@@ -97,7 +97,7 @@ class PlayerHandlers(BaseHandlers):
     def start_bot(self, update: Update, context: CallbackContext):
         user = update.effective_user
 
-        with open("../img/typing.gif", "rb") as gif:
+        with open(self._media("typing.gif"), "rb") as gif:
             update.message.reply_document(
                 gif, caption="👋 Welcome, {}!".format(user.first_name)
             ).reply_text("Press /new_game to play!")
@@ -140,7 +140,7 @@ class PlayerHandlers(BaseHandlers):
             pass
 
         context.bot.pin_chat_message(update.message.chat.id, counter.message_id)
-        update_job(player_id, context)
+        update_job(player_id, context, self.players_instance)
 
     # @send_typing_action
     def answer(self, update: Update, context: CallbackContext):
@@ -260,7 +260,7 @@ class PlayerHandlers(BaseHandlers):
 
             try:
                 medal, title, text = ACHIEVEMENTS[value]
-            except ValueError:
+            except (KeyError, ValueError):
                 update.message.reply_text("Wrong achievement number.")
                 return
 

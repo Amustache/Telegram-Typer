@@ -203,7 +203,7 @@ def main() -> None:
     dispatcher = updater.dispatcher
 
     # Commands
-    PlayerHandlers(Players, logger).add_commands(dispatcher)
+    PlayerHandlers(Players, logger, media_folder="./img").add_commands(dispatcher)
     AdminHandlers(Players, logger).add_commands(dispatcher)
 
     dispatcher.add_handler(

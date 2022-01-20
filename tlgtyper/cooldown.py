@@ -8,7 +8,8 @@ def update_cooldown_and_notify(player_id: int, players_instance, context: Callba
         if not players_instance.cache[player_id]["cooldown"]["informed"]:
             context.bot.send_message(
                 player_id,
-                "Oops! I have been a bit spammy...\nI have to wait about {} second{} before we can play again!".format(
+                "Oops! I have been a bit spammy...\n"
+                "I have to wait about {} second{} before we can play again!".format(
                     retry_after, "s" if retry_after > 1 else ""
                 ),
             )
