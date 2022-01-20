@@ -80,21 +80,6 @@ def get_player_stats(player_id: int) -> dict:
     }
 
 
-def handler_notify(update: Update, context: CallbackContext) -> None:
-    if update.effective_user.id == ADMIN_CHAT:
-        if update.message.reply_to_message:
-            logger.info("{} sent a global message.".format(update.effective_user.first_name))
-            for player in Player.Model.select():
-                context.bot.send_message(player.id, update.message.reply_to_message.text)
-        else:
-            text_to_send = "🗣 Message from admin 🗣\n{}".format(
-                update.effective_message.text.split(" ", 1)[1]
-            )
-            update.message.reply_text("This is a preview:").reply_text(text_to_send).reply_text(
-                "Reply /notify to the previous message to send it."
-            )
-
-
 def handler_stats(update: Update, context: CallbackContext) -> None:
     logger.info("{} requested the stats".format(update.effective_user.first_name))
 
@@ -639,7 +624,7 @@ def start_all_jobs(dispatcher) -> None:
         except (IndexError, ValueError):
             pass
 
-from tlgtyper.handlers import Admin
+from tlgtyper.handlers import AdminHandlers
 
 
 def main() -> None:
@@ -647,10 +632,9 @@ def main() -> None:
     dispatcher = updater.dispatcher
 
     # Commands
-    Admin(Player, logger).add_commands(dispatcher)
+    AdminHandlers(Player, logger).add_commands(dispatcher)
 
     dispatcher.add_handler(CommandHandler("start", handler_start))
-    # dispatcher.add_handler(CommandHandler("debug", add_messages))
     dispatcher.add_handler(CommandHandler(["new_game", "new"], handler_new))
     dispatcher.add_handler(CommandHandler("help", handler_help))
     dispatcher.add_handler(
@@ -662,8 +646,7 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler(["stop", "end", "end_game"], handler_stop))
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handler_answer))
     dispatcher.add_handler(CommandHandler("quickmode", handler_quickmode))
-    dispatcher.add_handler(CommandHandler("notify", handler_notify))
-    updater.dispatcher.add_handler(CallbackQueryHandler(handler_notify))
+
 
     start_all_jobs(dispatcher)
 
