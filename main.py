@@ -7,13 +7,13 @@ import logging
 
 
 from peewee import BigIntegerField, CharField, FloatField, IntegerField, Model, SqliteDatabase
-from telegram import ChatAction, ForceReply, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, Update
 from telegram.error import BadRequest, RetryAfter
 from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler, Filters, MessageHandler, Updater
 
 
 from achievements import ACHIEVEMENTS, ACHIEVEMENTS_ID, MAX_ACHIEVEMENTS
-from helpers import get_si, power_10, send_typing_action
+from tlgtyper.helpers import get_si, power_10, send_typing_action
 from secret import ADMIN_CHAT, BOT_NAME, BOT_TOKEN
 
 
