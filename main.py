@@ -13,9 +13,10 @@ from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler, 
 
 
 from achievements import ACHIEVEMENTS, ACHIEVEMENTS_ID, MAX_ACHIEVEMENTS
-from parameters import DB_PATH
-from tlgtyper.helpers import get_si, power_10, send_typing_action
+from parameters import DB_PATH, RESALE_PERCENTAGE, TIME_INTERVAL
 from secret import ADMIN_CHAT, BOT_NAME, BOT_TOKEN
+from tlgtyper.helpers import get_si, power_10, send_typing_action
+from tlgtyper.player import PlayerModel
 
 
 # Enable logging
@@ -28,9 +29,6 @@ logger = logging.getLogger(__name__)
 # Database
 DB = SqliteDatabase(DB_PATH)
 
-RESALE_PERCENTAGE = 0.77
-TIME_INTERVAL = 1
-
 user_cache = defaultdict(
     lambda: {
         "from_chat": 0,
@@ -39,45 +37,13 @@ user_cache = defaultdict(
     }
 )
 
-
-class Players(Model):
-    # Self
-    id = BigIntegerField(unique=True)
-    first_name = CharField(null=True)
-    pinned_message = BigIntegerField(null=True)
-
-    # Stats
-    messages = FloatField(default=0)
-    messages_total = FloatField(default=0)
-
-    contacts = FloatField(default=0)
-    contacts_state = IntegerField(default=0)
-    contacts_total = FloatField(default=0)
-
-    groups = FloatField(default=0)
-    groups_state = IntegerField(default=0)
-    groups_total = FloatField(default=0)
-
-    channels = FloatField(default=0)
-    channels_state = IntegerField(default=0)
-    channels_total = FloatField(default=0)
-
-    supergroups = FloatField(default=0)
-    supergroups_state = IntegerField(default=0)
-    supergroups_total = FloatField(default=0)
-
-    achievements = CharField(default="")
-
-    class Meta:
-        database = DB
-
-
+DB.bind([PlayerModel])
 DB.connect()
-DB.create_tables([Players])
+DB.create_tables([PlayerModel])
 
 
-def get_or_create_user(id: int) -> Players:
-    return Players.get_or_create(id=id)
+def get_or_create_user(id: int) -> PlayerModel:
+    return PlayerModel.get_or_create(id=id)
 
 
 def get_user_stats(id: int) -> dict:
@@ -131,7 +97,7 @@ def handler_notify(update: Update, context: CallbackContext) -> None:
     if update.effective_user.id == ADMIN_CHAT:
         if update.message.reply_to_message:
             logger.info("{} sent a global message.".format(update.effective_user.first_name))
-            for player in Players.select():
+            for player in PlayerModel.select():
                 context.bot.send_message(player.id, update.message.reply_to_message.text)
         else:
             text_to_send = "🗣 Message from admin 🗣\n{}".format(
@@ -443,9 +409,9 @@ def handler_stop(update: Update, context: CallbackContext) -> None:
     logger.info("{} deleted their account".format(update.effective_user.first_name))
 
     id = update.effective_user.id
-    obj = Players.get(Players.id == id)
+    obj = PlayerModel.get(PlayerModel.id == id)
     obj.delete_instance()
-    Players.delete().where(Players.id == id).execute()
+    PlayerModel.delete().where(PlayerModel.id == id).execute()
     remove_job_if_exists(str(id), context)
 
     try:
@@ -686,7 +652,7 @@ def update_job(id: int, context: CallbackContext) -> None:
 
 
 def start_all_jobs(dispatcher) -> None:
-    for user in Players.select():
+    for user in PlayerModel.select():
         id = user.id
         try:
             remove_job_if_exists(str(id), dispatcher)

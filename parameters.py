@@ -1,1 +1,3 @@
 DB_PATH = "./db/database.db"
+RESALE_PERCENTAGE = 0.77
+TIME_INTERVAL = 1
