@@ -6,17 +6,18 @@ from datetime import datetime
 import os
 
 
-from telegram import KeyboardButton, ReplyKeyboardMarkup, Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.error import RetryAfter, BadRequest
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, Update
+from telegram.error import BadRequest, RetryAfter
 from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler, Filters, MessageHandler
+
 
 from parameters import RESALE_PERCENTAGE
 from secret import ADMIN_CHAT, BOT_LINK
 from tlgtyper.achievements import ACHIEVEMENTS, ACHIEVEMENTS_ID, MAX_ACHIEVEMENTS
 from tlgtyper.cooldown import update_cooldown_and_notify
-from tlgtyper.helpers import get_si, send_typing_action, power_10
+from tlgtyper.helpers import get_si, power_10, send_typing_action
 from tlgtyper.jobs import remove_job_if_exists, update_job
-from tlgtyper.texts import HELP_COMMANDS, get_quantities
+from tlgtyper.texts import get_quantities, HELP_COMMANDS
 
 
 class BaseHandlers:
@@ -321,16 +322,16 @@ class PlayerHandlers(BaseHandlers):
                             if 10 <= stats[item]["quantity"]:
                                 ach = power_10(stats[item]["quantity"])
                                 while ach >= 10:
-                                    self.players_instance.cache[update.effective_user.id]["achievements"].append(
-                                        ACHIEVEMENTS_ID[item]["quantity{}".format(ach)]["id"]
-                                    )
+                                    self.players_instance.cache[update.effective_user.id][
+                                        "achievements"
+                                    ].append(ACHIEVEMENTS_ID[item]["quantity{}".format(ach)]["id"])
                                     ach //= 10
                             if 10 <= stats[item]["total"]:
                                 ach = power_10(stats[item]["total"])
                                 while ach >= 10:
-                                    self.players_instance.cache[update.effective_user.id]["achievements"].append(
-                                        ACHIEVEMENTS_ID[item]["total{}".format(ach)]["id"]
-                                    )
+                                    self.players_instance.cache[update.effective_user.id][
+                                        "achievements"
+                                    ].append(ACHIEVEMENTS_ID[item]["total{}".format(ach)]["id"])
                                     ach //= 10
 
                             self.players_instance.update(player_id, context)
@@ -351,7 +352,9 @@ class PlayerHandlers(BaseHandlers):
                             self.players_instance.update(player_id, context)
 
                         message = "*🧮 Interface 🧮*\n\n*{}*\n".format(item.capitalize())
-                        message += "You have {} {}\.\n".format(get_si(stats[item]["quantity"]), item)
+                        message += "You have {} {}\.\n".format(
+                            get_si(stats[item]["quantity"]), item
+                        )
                         message += "📈 Join:"
                         for currency, quantity in buy_price.items():
                             message += " –{} {} ".format(quantity, currency)
@@ -368,7 +371,8 @@ class PlayerHandlers(BaseHandlers):
                         if can_buy >= 1:
                             buy.append(
                                 InlineKeyboardButton(
-                                    "📈 Join 1 {}".format(item), callback_data="{}b1".format(attrs["id"])
+                                    "📈 Join 1 {}".format(item),
+                                    callback_data="{}b1".format(attrs["id"]),
                                 )
                             )
                             if can_buy >= 10:
@@ -445,7 +449,9 @@ class PlayerHandlers(BaseHandlers):
                     message, reply_markup=reply_markup, parse_mode="MarkdownV2"
                 )
             else:
-                update.message.reply_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
+                update.message.reply_text(
+                    message, reply_markup=reply_markup, parse_mode="MarkdownV2"
+                )
 
 
 class AdminHandlers(BaseHandlers):
