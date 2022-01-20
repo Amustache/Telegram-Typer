@@ -1,20 +1,23 @@
 """
 Handlers for the bot.
 """
-import os
 from collections import Counter
 from datetime import datetime
+import os
 
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
+
+from telegram import KeyboardButton, ReplyKeyboardMarkup, Update
 from telegram.error import RetryAfter
-from telegram.ext import CommandHandler, CallbackContext, CallbackQueryHandler, MessageHandler, Filters
+from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler, Filters, MessageHandler
+
 
 from secret import ADMIN_CHAT, BOT_NAME
-from tlgtyper.achievements import ACHIEVEMENTS_ID, ACHIEVEMENTS, MAX_ACHIEVEMENTS
+from tlgtyper.achievements import ACHIEVEMENTS, ACHIEVEMENTS_ID, MAX_ACHIEVEMENTS
 from tlgtyper.cooldown import update_cooldown_and_notify
-from tlgtyper.helpers import send_typing_action, get_si
-from tlgtyper.jobs import update_job, remove_job_if_exists
+from tlgtyper.helpers import get_si, send_typing_action
+from tlgtyper.jobs import remove_job_if_exists, update_job
 from tlgtyper.texts import HELP_COMMANDS
+
 
 class BaseHandlers:
     """
@@ -84,15 +87,20 @@ class PlayerHandlers(BaseHandlers):
             CommandHandler(["achievements", "achievement"], self.show_achievements),
             CommandHandler(["stats", "stat"], self.show_stats),
         ]
-        super().__init__(command_handlers=command_handlers, players_instance=players_instance, logger=logger,
-                         media_folder=media_folder)
+        super().__init__(
+            command_handlers=command_handlers,
+            players_instance=players_instance,
+            logger=logger,
+            media_folder=media_folder,
+        )
 
     def start_bot(self, update: Update, context: CallbackContext):
         user = update.effective_user
 
         with open("../img/typing.gif", "rb") as gif:
-            update.message.reply_document(gif, caption="👋 Welcome, {}!".format(user.first_name)).reply_text(
-                "Press /new_game to play!")
+            update.message.reply_document(
+                gif, caption="👋 Welcome, {}!".format(user.first_name)
+            ).reply_text("Press /new_game to play!")
 
         self.logger.info("{} started the bot".format(user.first_name))
 
@@ -134,7 +142,7 @@ class PlayerHandlers(BaseHandlers):
         context.bot.pin_chat_message(update.message.chat.id, counter.message_id)
         update_job(player_id, context)
 
-    #@send_typing_action
+    # @send_typing_action
     def answer(self, update: Update, context: CallbackContext):
         user = update.effective_user
         player_id = user.id
@@ -174,7 +182,9 @@ class PlayerHandlers(BaseHandlers):
 
         obj = self.players_instance.Model.get(self.players_instance.Model.id == player_id)
         obj.delete_instance()
-        self.players_instance.Model.delete().where(self.players_instance.Model.id == player_id).execute()
+        self.players_instance.Model.delete().where(
+            self.players_instance.Model.id == player_id
+        ).execute()
         remove_job_if_exists(str(player_id), context)
 
         try:
@@ -196,8 +206,11 @@ class PlayerHandlers(BaseHandlers):
 
         user_achievements = self.players_instance.get_achievements(player_id)
         medals = Counter(
-            [medal for achievement_id, (medal, _, _) in sorted(ACHIEVEMENTS.items()) if
-             achievement_id in user_achievements]
+            [
+                medal
+                for achievement_id, (medal, _, _) in sorted(ACHIEVEMENTS.items())
+                if achievement_id in user_achievements
+            ]
         )
         message += "*Achievements*\n"
         message += "– Unlocked {} achievements out of {}\.\n".format(
@@ -261,7 +274,7 @@ class PlayerHandlers(BaseHandlers):
                 "{:02X}: {}".format(id, medal if id in user_achievements else question)
                 for id, (medal, _, _) in sorted(ACHIEVEMENTS.items())
             ]
-            things = [things[i: i + 5] for i in range(0, len(things), 5)]
+            things = [things[i : i + 5] for i in range(0, len(things), 5)]
             message = "*🌟 Achievements 🌟*\n\n"
             message += "\n".join([", ".join(text) for text in things])
             message += "\n\nUse `/achievement number` to have more information\."
@@ -277,8 +290,12 @@ class AdminHandlers(BaseHandlers):
             CommandHandler(["notify"], self.notify_all),
             CallbackQueryHandler(self.notify_all),
         ]
-        super().__init__(command_handlers=command_handlers, players_instance=players_instance, logger=logger,
-                         media_folder=media_folder)
+        super().__init__(
+            command_handlers=command_handlers,
+            players_instance=players_instance,
+            logger=logger,
+            media_folder=media_folder,
+        )
 
     def be_rich(self, update: Update, context: CallbackContext) -> None:
         player_id = update.effective_user.id
@@ -295,7 +312,9 @@ class AdminHandlers(BaseHandlers):
             if update.message.reply_to_message:
                 for player in self.players_instance.Model.select():
                     context.bot.send_message(player.id, update.message.reply_to_message.text)
-                self.logger.info("{} sent a global message.".format(update.effective_user.first_name))
+                self.logger.info(
+                    "{} sent a global message.".format(update.effective_user.first_name)
+                )
             else:
                 text_to_send = "🗣 Message from admin 🗣\n{}".format(
                     update.effective_message.text.split(" ", 1)[1]

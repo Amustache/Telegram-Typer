@@ -2,20 +2,23 @@
 # pylint: disable=C0116,W0613
 import logging
 
+
 from peewee import SqliteDatabase
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.error import BadRequest
 from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler, Updater
 
-from tlgtyper.achievements import ACHIEVEMENTS_ID
+
 from parameters import DB_PATH, RESALE_PERCENTAGE
 from secret import BOT_TOKEN
+from tlgtyper.achievements import ACHIEVEMENTS_ID
 from tlgtyper.cooldown import update_cooldown_and_notify
+from tlgtyper.handlers import AdminHandlers, PlayerHandlers
 from tlgtyper.helpers import get_si, power_10
 from tlgtyper.jobs import start_all_jobs
 from tlgtyper.player import Players
-from tlgtyper.handlers import AdminHandlers, PlayerHandlers
 from tlgtyper.texts import get_quantities
+
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO

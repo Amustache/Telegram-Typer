@@ -1,10 +1,12 @@
 from collections import defaultdict
 
+
 from peewee import BigIntegerField, CharField, FloatField, IntegerField, Model
-from telegram.error import RetryAfter, BadRequest
+from telegram.error import BadRequest, RetryAfter
 from telegram.ext import CallbackContext
 
-from tlgtyper.achievements import ACHIEVEMENTS_ID, ACHIEVEMENTS
+
+from tlgtyper.achievements import ACHIEVEMENTS, ACHIEVEMENTS_ID
 from tlgtyper.cooldown import set_cooldown, update_cooldown_and_notify
 from tlgtyper.items import ITEMS
 from tlgtyper.jobs import remove_job_if_exists
@@ -58,11 +60,14 @@ class Players:
         print(scope)
 
         result = {
-            item: {**attrs, **{
-                "unlocked": eval("player.{}_state".format(item), scope),
-                "quantity": eval("player.{}".format(item), scope),
-                "total": eval("player.{}_total".format(item), scope),
-            }}
+            item: {
+                **attrs,
+                **{
+                    "unlocked": eval("player.{}_state".format(item), scope),
+                    "quantity": eval("player.{}".format(item), scope),
+                    "total": eval("player.{}_total".format(item), scope),
+                },
+            }
             for item, attrs in ITEMS.items()
         }
 
@@ -81,16 +86,22 @@ class Players:
         for item, attrs in stats.items():  # e.g., "contacts": {"unlock_at", ...}
             if "unlock_at" in attrs and not stats[item]["unlocked"]:
                 unlock = True
-                for unlock_item, unlock_quantity in attrs["unlock_at"].items():  # e.g., "messages": 10
+                for unlock_item, unlock_quantity in attrs[
+                    "unlock_at"
+                ].items():  # e.g., "messages": 10
                     if stats[unlock_item]["total"] < unlock_quantity:
                         unlock = False
                         break
                 if unlock:
                     exec("player.{}_state = 1".format(item))
                     player.save()
-                    Players.cache[player_id]["achievements"].append(ACHIEVEMENTS_ID[item]["unlocked"]["id"])
+                    Players.cache[player_id]["achievements"].append(
+                        ACHIEVEMENTS_ID[item]["unlocked"]["id"]
+                    )
 
-    def update_pinned_message(self, player_id: int, context: CallbackContext) -> None:  # TODO ugly and not in the correct place
+    def update_pinned_message(
+        self, player_id: int, context: CallbackContext
+    ) -> None:  # TODO ugly and not in the correct place
         user, _ = self.get_or_create(player_id)
         if update_cooldown_and_notify(player_id, self, context):
             return
@@ -100,7 +111,7 @@ class Players:
         try:
             context.bot.edit_message_text(message, player_id, user.pinned_message)
         except RetryAfter as e:
-            #self.logger.error(str(e))
+            # self.logger.error(str(e))
             retry_after = int(str(e).split("in ")[1].split(".0")[0])
             self.cache[player_id]["cooldown"]["retry_after"] = retry_after
         except BadRequest as e:  # Edit problem
@@ -109,10 +120,12 @@ class Players:
                 "Oops\! It seems like I did not find the pinned message\. Could you use /new\_game again, please\?",
                 parse_mode="MarkdownV2",
             )
-            #self.logger.error(str(e))
+            # self.logger.error(str(e))
             remove_job_if_exists(str(player_id), context)
 
-    def update_achievements(self, player_id: int, context: CallbackContext) -> None:  # TODO ugly and not in the correct place
+    def update_achievements(
+        self, player_id: int, context: CallbackContext
+    ) -> None:  # TODO ugly and not in the correct place
         user, _ = self.get_or_create(player_id)
         user_achievements = self.get_achievements(player_id)
         data = list(set(self.cache[player_id]["achievements"]))

@@ -1,5 +1,6 @@
 from telegram.ext import CallbackContext
 
+
 from parameters import TIME_INTERVAL
 from tlgtyper.achievements import ACHIEVEMENTS_ID
 from tlgtyper.helpers import power_10
@@ -18,7 +19,10 @@ def update_job(player_id: int, context: CallbackContext) -> None:
     try:
         remove_job_if_exists(str(player_id), context)
         context.job_queue.run_repeating(
-            update_messages_and_contacts_from_job, TIME_INTERVAL, context=player_id, name=str(player_id)
+            update_messages_and_contacts_from_job,
+            TIME_INTERVAL,
+            context=player_id,
+            name=str(player_id),
         )
     except (IndexError, ValueError):
         return
@@ -30,7 +34,10 @@ def start_all_jobs(dispatcher, players_instance) -> None:
         # try:
         remove_job_if_exists(str(player_id), dispatcher)
         dispatcher.job_queue.run_repeating(
-            update_messages_and_contacts_from_job, TIME_INTERVAL, context=(player_id, players_instance), name=str(player_id)
+            update_messages_and_contacts_from_job,
+            TIME_INTERVAL,
+            context=(player_id, players_instance),
+            name=str(player_id),
         )
         # except (IndexError, ValueError) as e:
         #     pass

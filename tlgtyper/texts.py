@@ -1,5 +1,6 @@
 from tlgtyper.helpers import get_si
 
+
 HELP_COMMANDS = (
     "– Use /new to start a new game\n"
     "– Use /reset to reset a blocked counter.\n"
