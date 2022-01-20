@@ -36,7 +36,7 @@ class PlayerInstance:
         lambda: {
             "from_chat": 0,
             "achievements": [],
-            "cooldown": {"informed": False, "retryafter": 0, "counter": 0},
+            "cooldown": {"informed": False, "retry_after": 0, "counter": 0},
         }
     )
 

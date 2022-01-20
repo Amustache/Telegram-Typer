@@ -15,6 +15,7 @@ from parameters import DB_PATH, RESALE_PERCENTAGE, TIME_INTERVAL
 from secret import ADMIN_CHAT, BOT_NAME, BOT_TOKEN
 from tlgtyper.helpers import get_si, power_10, send_typing_action
 from tlgtyper.player import PlayerInstance
+from tlgtyper.handlers import AdminHandlers, PlayerHandlers
 
 # Enable logging
 logging.basicConfig(
@@ -80,101 +81,7 @@ def get_player_stats(player_id: int) -> dict:
     }
 
 
-def handler_stats(update: Update, context: CallbackContext) -> None:
-    logger.info("{} requested the stats".format(update.effective_user.first_name))
 
-    stats = get_player_stats(update.effective_user.id)
-    message = "*📊 Stats 📊*\n_Stats of {} as of {}\._\n\n".format(
-        update.effective_user.first_name, datetime.now().strftime("%B %d, %Y at %H:%M GMT\+1")
-    )
-
-    user_achievements = get_player_achievements(update.effective_user.id)
-    medals = Counter(
-        [medal for id, (medal, _, _) in sorted(ACHIEVEMENTS.items()) if id in user_achievements]
-    )
-    message += "*Achievements*\n"
-    message += "– Unlocked {} achievements out of {}\.\n".format(
-        sum(medals.values()), MAX_ACHIEVEMENTS
-    )
-    message += "– {}\n".format(
-        ", ".join(["{} {}".format(qt, medal) for medal, qt in medals.items()])
-    )
-    message += "\n"
-
-    message += "*{}*\n".format("Messages")
-    message += "– {} current {}\.\n".format(get_si(stats["messages"]["quantity"]), "messages")
-    message += "– {} {} in total\.\n".format(get_si(stats["messages"]["total"]), "messages")
-    message += "\n"
-
-    for item, attrs in stats.items():  # e.g., "contacts": {"unlock_at", ...}
-        if "unlock_at" in attrs and stats[item]["unlocked"]:
-            message += "*{}*\n".format(item.capitalize())
-            message += "– {} current {}\.\n".format(get_si(attrs["quantity"]), item)
-            message += "– {} {} in total\.\n".format(get_si(attrs["total"]), item)
-            for currency, quantity in attrs["gain"].items():
-                message += "– Add {} {} per second\.\n".format(
-                    get_si(attrs["quantity"] * quantity, type="f"), currency
-                )
-            message += "\n"
-
-    message += BOT_NAME
-
-    update.message.reply_text(message, parse_mode="MarkdownV2")
-
-
-def handler_start(update: Update, context: CallbackContext) -> None:
-    logger.info("{} started the bot".format(update.effective_user.first_name))
-
-    _user = update.effective_user
-    update.message.reply_document(
-        open("./img/typing.gif", "rb"), caption="👋 Welcome, {}!".format(_user.first_name)
-    )
-
-    update.message.reply_text("Press /new_game to play!")
-
-
-def handler_new(update: Update, context: CallbackContext) -> None:
-    logger.info("{} started a new game".format(update.effective_user.first_name))
-
-    _user = update.effective_user
-    user, created = Player.get_or_create(_user.id)
-
-    if created:
-        user.first_name = _user.first_name
-        user.save()
-
-        Player.cache[update.effective_user.id]["achievements"].append(
-            ACHIEVEMENTS_ID["misc"]["start"]["id"]
-        )
-
-        update.message.reply_text("❕ You're ready to play!")
-
-        update.message.reply_text(
-            "Use /new_game to start a new game, or to reset a blocked counter.\nUse /interface to show the interface to buy/sell things.\nUse /achievements to show your achievements.\nUse /stats to get your stats to share with your friends.\nFinally, use /end to stop the game and delete your account."
-        )
-
-        update.message.reply_text(
-            "Now, I am going to pin your counter to this conversation, so that you can see your progress!"
-        )
-
-    sleep(1)  # ... Fnck you.
-    counter = update.message.reply_text(
-        "Send a text (not a command!) to the bot to see this message update.\n(If the pinned message does not update, please do /new_game again.)"
-    )
-    user.pinned_message = counter.message_id
-    user.save()
-    try:
-        context.bot.unpin_chat_message(update.message.chat.id)
-    except:
-        pass
-    context.bot.pin_chat_message(update.message.chat.id, counter.message_id)
-    update_job(_user.id, context)
-
-
-def handler_help(update: Update, context: CallbackContext) -> None:
-    logger.info("{} requested the help".format(update.effective_user.first_name))
-
-    update.message.reply_text("Help!")  # TODO
 
 
 def handler_interface(update: Update, context: CallbackContext) -> None:
@@ -367,23 +274,6 @@ def set_cooldown(player_id: int, COUNTER_LIMIT=100) -> None:
         Player.cache[player_id]["cooldown"]["retryafter"] = 0
 
 
-def handler_stop(update: Update, context: CallbackContext) -> None:
-    logger.info("{} deleted their account".format(update.effective_user.first_name))
-
-    id = update.effective_user.id
-    obj = Player.Model.get(Player.Model.id == id)
-    obj.delete_instance()
-    Player.Model.delete().where(Player.Model.id == id).execute()
-    remove_job_if_exists(str(id), context)
-
-    try:
-        context.bot.unpin_chat_message(update.message.chat.id)
-    except:
-        pass
-
-    update.message.reply_text("Game stopped, account deleted.")  # TODO
-
-
 def set_unlocks(player_id: int) -> None:
     user, _ = Player.get_or_create(player_id)
     stats = get_player_stats(player_id)
@@ -460,43 +350,7 @@ def update_achievements(player_id: int, context: CallbackContext) -> None:
             context.bot.send_message(player_id, message, parse_mode="MarkdownV2")
 
 
-def handler_achievements(update: Update, context: CallbackContext) -> None:
-    logger.info("{} requested the achievements".format(update.effective_user.first_name))
 
-    user_achievements = get_player_achievements(update.effective_user.id)
-    question = "❔"
-
-    if context.args:
-        try:
-            value = int(context.args[0], 16)
-            if value < 0 or value > 0xFF:
-                raise ValueError
-        except ValueError:
-            update.message.reply_text("Usage: `/achievement` or `/achievement number`")
-            return
-
-        try:
-            medal, title, text = ACHIEVEMENTS[value]
-        except ValueError:
-            update.message.reply_text("Wrong achievement number.")
-            return
-
-        if not value in user_achievements:
-            medal = question
-            text = "\[You don't have this achievement just yet\.\.\.\]"
-        message = "*{} {} {}*\n_{}_".format(medal, title, medal, text)
-        update.message.reply_text(message, parse_mode="MarkdownV2")
-    else:
-        things = [
-            "{:02X}: {}".format(id, medal if id in user_achievements else question)
-            for id, (medal, _, _) in sorted(ACHIEVEMENTS.items())
-        ]
-        things = [things[i: i + 5] for i in range(0, len(things), 5)]
-        message = "*🌟 Achievements 🌟*\n\n"
-        message += "\n".join([", ".join(text) for text in things])
-        message += "\n\nUse `/achievement number` to have more information\."
-
-        update.message.reply_text(message, parse_mode="MarkdownV2")
 
 
 def update_player(player_id: int, context: CallbackContext) -> None:
@@ -504,36 +358,6 @@ def update_player(player_id: int, context: CallbackContext) -> None:
     set_unlocks(player_id)
     update_pinned_message(player_id, context)
     update_achievements(player_id, context)
-
-
-@send_typing_action
-def handler_answer(update: Update, context: CallbackContext) -> None:
-    id = update.effective_user.id
-    if update_cooldown_and_notify(id, context):
-        return
-
-    try:
-        update.message.reply_text(update.message.text)  # TODO
-        if update.message.text == "J'aime les loutres":
-            Player.cache[update.effective_user.id]["achievements"].append(
-                ACHIEVEMENTS_ID["misc"]["loutres"]["id"]
-            )
-        Player.cache[update.effective_user.id]["from_chat"] += 2
-        Player.cache[id]["cooldown"]["counter"] += 1
-    except RetryAfter as e:
-        logger.error(str(e))
-        retryafter = int(e.split("in ")[1].split(".0")[0])
-        Player.cache[id]["cooldown"]["retryafter"] = retryafter
-
-
-def handler_quickmode(update: Update, context: CallbackContext) -> None:
-    kb = [
-        [KeyboardButton("Blablabla")],
-    ]
-    kb_markup = ReplyKeyboardMarkup(kb)
-    update.message.reply_text(
-        "Simply press the big keyboard button to use quickmode!", reply_markup=kb_markup
-    )
 
 
 def update_messages_and_contacts_from_job(context: CallbackContext) -> None:
@@ -624,29 +448,19 @@ def start_all_jobs(dispatcher) -> None:
         except (IndexError, ValueError):
             pass
 
-from tlgtyper.handlers import AdminHandlers
-
 
 def main() -> None:
     updater = Updater(BOT_TOKEN)
     dispatcher = updater.dispatcher
 
     # Commands
+    PlayerHandlers(Player, logger).add_commands(dispatcher)
     AdminHandlers(Player, logger).add_commands(dispatcher)
 
-    dispatcher.add_handler(CommandHandler("start", handler_start))
-    dispatcher.add_handler(CommandHandler(["new_game", "new"], handler_new))
-    dispatcher.add_handler(CommandHandler("help", handler_help))
     dispatcher.add_handler(
         CommandHandler(["interface", "buy", "sell", "join", "leave"], handler_interface)
     )
     updater.dispatcher.add_handler(CallbackQueryHandler(handler_interface))
-    dispatcher.add_handler(CommandHandler(["achievements", "achievement"], handler_achievements))
-    dispatcher.add_handler(CommandHandler(["stats", "stat"], handler_stats))
-    dispatcher.add_handler(CommandHandler(["stop", "end", "end_game"], handler_stop))
-    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handler_answer))
-    dispatcher.add_handler(CommandHandler("quickmode", handler_quickmode))
-
 
     start_all_jobs(dispatcher)
 
