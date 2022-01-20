@@ -10,7 +10,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton,
 from telegram.error import BadRequest, RetryAfter
 from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler, Filters, MessageHandler, Updater
 
-from achievements import ACHIEVEMENTS, ACHIEVEMENTS_ID, MAX_ACHIEVEMENTS
+from tlgtyper.achievements import ACHIEVEMENTS, ACHIEVEMENTS_ID, MAX_ACHIEVEMENTS
 from parameters import DB_PATH, RESALE_PERCENTAGE, TIME_INTERVAL
 from secret import ADMIN_CHAT, BOT_NAME, BOT_TOKEN
 from tlgtyper.helpers import get_si, power_10, send_typing_action

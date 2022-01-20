@@ -1,5 +1,5 @@
 MEDALS = {
-    1: "🏅",  # Special
+    -1: "🏅",  # Special
     2: "🎖",  # Star
     3: "🥇",  # Gold
     4: "🥈",  # Silver
