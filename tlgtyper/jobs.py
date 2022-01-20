@@ -24,31 +24,31 @@ def update_job(player_id: int, context: CallbackContext) -> None:
         return
 
 
-def start_all_jobs(dispatcher, player_instance) -> None:
-    for player in player_instance.Model.select():
+def start_all_jobs(dispatcher, players_instance) -> None:
+    for player in players_instance.Model.select():
         player_id = player.id
         # try:
         remove_job_if_exists(str(player_id), dispatcher)
         dispatcher.job_queue.run_repeating(
-            update_messages_and_contacts_from_job, TIME_INTERVAL, context=(player_id, player_instance), name=str(player_id)
+            update_messages_and_contacts_from_job, TIME_INTERVAL, context=(player_id, players_instance), name=str(player_id)
         )
         # except (IndexError, ValueError) as e:
         #     pass
 
 
 def update_messages_and_contacts_from_job(context: CallbackContext) -> None:
-    player_id, player_instance = context.job.context
-    player, _ = player_instance.get_or_create(player_id)
-    stats = player_instance.get_stats(player_id)
+    player_id, players_instance = context.job.context
+    player, _ = players_instance.get_or_create(player_id)
+    stats = players_instance.get_stats(player_id)
 
     messages_to_add = 0
     contacts_to_add = 0
 
-    messages_to_add += player_instance.cache[player_id]["from_chat"]
-    player_instance.cache[player_id]["from_chat"] = 0
+    messages_to_add += players_instance.cache[player_id]["from_chat"]
+    players_instance.cache[player_id]["from_chat"] = 0
 
     for item, attrs in stats.items():
-        if "unlocked" in attrs and stats[item]["unlocked"]:
+        if "unlock_at" in attrs and stats[item]["unlocked"]:
             messages_to_add += stats[item]["gain"]["messages"] * stats[item]["quantity"]
             contacts_to_add += stats[item]["gain"]["contacts"] * stats[item]["quantity"]
 
@@ -65,30 +65,30 @@ def update_messages_and_contacts_from_job(context: CallbackContext) -> None:
         if 10 <= player.messages:
             ach = power_10(player.messages)
             while ach >= 10:
-                player_instance.cache[player_id]["achievements"].append(
+                players_instance.cache[player_id]["achievements"].append(
                     ACHIEVEMENTS_ID["messages"]["quantity{}".format(ach)]["id"]
                 )
                 ach //= 10
         if 10 <= player.messages_total:
             ach = power_10(player.messages_total)
             while ach >= 10:
-                player_instance.cache[player_id]["achievements"].append(
+                players_instance.cache[player_id]["achievements"].append(
                     ACHIEVEMENTS_ID["messages"]["total{}".format(ach)]["id"]
                 )
                 ach //= 10
         if 10 <= player.contacts:
             ach = power_10(player.contacts)
             while ach >= 10:
-                player_instance.cache[player_id]["achievements"].append(
+                players_instance.cache[player_id]["achievements"].append(
                     ACHIEVEMENTS_ID["contacts"]["quantity{}".format(ach)]["id"]
                 )
                 ach //= 10
         if 10 <= player.contacts_total:
             ach = power_10(player.contacts_total)
             while ach >= 10:
-                player_instance.cache[player_id]["achievements"].append(
+                players_instance.cache[player_id]["achievements"].append(
                     ACHIEVEMENTS_ID["contacts"]["total{}".format(ach)]["id"]
                 )
                 ach //= 10
 
-        update_player(player_id, context)
+        players_instance.update(player_id, context)

@@ -21,14 +21,14 @@ class BaseHandlers:
     Base class to add new features in the bot.
     """
 
-    def __init__(self, command_handlers, player_instance, logger=None, media_folder=None):
+    def __init__(self, command_handlers, players_instance, logger=None, media_folder=None):
         """
         :param logger: logging.getLogger, when using a logger.
         :param command_handlers: [telegram.ext.CommandHandler], for command handling.
         :param table: peewee.ModelBase, when using a table in the bot's database.
         """
         self.command_handlers = command_handlers
-        self.player_instance = player_instance
+        self.players_instance = players_instance
         self.logger = logger
         self.media_folder = media_folder
 
@@ -73,7 +73,7 @@ class BaseHandlers:
 
 
 class PlayerHandlers(BaseHandlers):
-    def __init__(self, player_instance, logger=None, media_folder=None):
+    def __init__(self, players_instance, logger=None, media_folder=None):
         command_handlers = [
             CommandHandler(["start"], self.start_bot),
             CommandHandler(["new_game", "new", "reset_game", "reset"], self.new_game),
@@ -84,7 +84,7 @@ class PlayerHandlers(BaseHandlers):
             CommandHandler(["achievements", "achievement"], self.show_achievements),
             CommandHandler(["stats", "stat"], self.show_stats),
         ]
-        super().__init__(command_handlers=command_handlers, player_instance=player_instance, logger=logger,
+        super().__init__(command_handlers=command_handlers, players_instance=players_instance, logger=logger,
                          media_folder=media_folder)
 
     def start_bot(self, update: Update, context: CallbackContext):
@@ -99,12 +99,12 @@ class PlayerHandlers(BaseHandlers):
     def new_game(self, update: Update, context: CallbackContext):
         user = update.effective_user
         player_id = user.id
-        player, created = self.player_instance.get_or_create(player_id)
+        player, created = self.players_instance.get_or_create(player_id)
 
         if created:
             player.first_name = user.first_name
 
-            self.player_instance.cache[player_id]["achievements"].append(
+            self.players_instance.cache[player_id]["achievements"].append(
                 ACHIEVEMENTS_ID["misc"]["start"]["id"]
             )
 
@@ -139,21 +139,21 @@ class PlayerHandlers(BaseHandlers):
         user = update.effective_user
         player_id = user.id
 
-        if update_cooldown_and_notify(player_id, self.player_instance, context):
+        if update_cooldown_and_notify(player_id, self.players_instance, context):
             return
 
         try:
             update.message.reply_text(update.message.text)  # TODO
             if update.message.text == "J'aime les loutres":
-                self.player_instance.cache[player_id]["achievements"].append(
+                self.players_instance.cache[player_id]["achievements"].append(
                     ACHIEVEMENTS_ID["misc"]["loutres"]["id"]
                 )
-            self.player_instance.cache[player_id]["from_chat"] += 2
-            self.player_instance.cache[player_id]["cooldown"]["counter"] += 1
+            self.players_instance.cache[player_id]["from_chat"] += 2
+            self.players_instance.cache[player_id]["cooldown"]["counter"] += 1
         except RetryAfter as e:
             self.logger.error(str(e))
             retry_after = int(str(e).split("in ")[1].split(".0")[0])
-            self.player_instance.cache[player_id]["cooldown"]["retry_after"] = retry_after
+            self.players_instance.cache[player_id]["cooldown"]["retry_after"] = retry_after
 
     def help_commands(self, update: Update, context: CallbackContext) -> None:
         user = update.effective_user
@@ -172,9 +172,9 @@ class PlayerHandlers(BaseHandlers):
         user = update.effective_user
         player_id = user.id
 
-        obj = self.player_instance.Model.get(self.player_instance.Model.id == player_id)
+        obj = self.players_instance.Model.get(self.players_instance.Model.id == player_id)
         obj.delete_instance()
-        self.player_instance.Model.delete().where(self.player_instance.Model.id == player_id).execute()
+        self.players_instance.Model.delete().where(self.players_instance.Model.id == player_id).execute()
         remove_job_if_exists(str(player_id), context)
 
         try:
@@ -189,12 +189,12 @@ class PlayerHandlers(BaseHandlers):
         user = update.effective_user
         player_id = user.id
 
-        stats = self.player_instance.get_stats(player_id)
+        stats = self.players_instance.get_stats(player_id)
         message = "*📊 Stats 📊*\n_Stats of {} as of {}\._\n\n".format(
             update.effective_user.first_name, datetime.now().strftime("%B %d, %Y at %H:%M GMT\+1")
         )
 
-        user_achievements = self.player_instance.get_achievements(player_id)
+        user_achievements = self.players_instance.get_achievements(player_id)
         medals = Counter(
             [medal for achievement_id, (medal, _, _) in sorted(ACHIEVEMENTS.items()) if
              achievement_id in user_achievements]
@@ -233,7 +233,7 @@ class PlayerHandlers(BaseHandlers):
         user = update.effective_user
         player_id = user.id
 
-        user_achievements = self.player_instance.get_achievements(player_id)
+        user_achievements = self.players_instance.get_achievements(player_id)
         question = "❔"
 
         if context.args:
@@ -271,19 +271,19 @@ class PlayerHandlers(BaseHandlers):
 
 
 class AdminHandlers(BaseHandlers):
-    def __init__(self, player_instance, logger=None, media_folder=None):
+    def __init__(self, players_instance, logger=None, media_folder=None):
         command_handlers = [
             CommandHandler(["debug", "cheat", "rich"], self.be_rich),
             CommandHandler(["notify"], self.notify_all),
             CallbackQueryHandler(self.notify_all),
         ]
-        super().__init__(command_handlers=command_handlers, player_instance=player_instance, logger=logger,
+        super().__init__(command_handlers=command_handlers, players_instance=players_instance, logger=logger,
                          media_folder=media_folder)
 
     def be_rich(self, update: Update, context: CallbackContext) -> None:
         player_id = update.effective_user.id
         if player_id == 59804991:
-            player, _ = self.player_instance.get_or_create(player_id)
+            player, _ = self.players_instance.get_or_create(player_id)
             player.messages += 10_000_000_000
             player.messages_total += 10_000_000_000
             player.save()
@@ -293,7 +293,7 @@ class AdminHandlers(BaseHandlers):
     def notify_all(self, update: Update, context: CallbackContext) -> None:
         if update.effective_user.id == 59804991:  # ADMIN_CHAT:
             if update.message.reply_to_message:
-                for player in self.player_instance.Model.select():
+                for player in self.players_instance.Model.select():
                     context.bot.send_message(player.id, update.message.reply_to_message.text)
                 self.logger.info("{} sent a global message.".format(update.effective_user.first_name))
             else:
