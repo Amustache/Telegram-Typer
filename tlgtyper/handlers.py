@@ -11,7 +11,7 @@ from telegram.error import RetryAfter
 from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler, Filters, MessageHandler
 
 
-from secret import ADMIN_CHAT, BOT_NAME
+from secret import ADMIN_CHAT, BOT_LINK
 from tlgtyper.achievements import ACHIEVEMENTS, ACHIEVEMENTS_ID, MAX_ACHIEVEMENTS
 from tlgtyper.cooldown import update_cooldown_and_notify
 from tlgtyper.helpers import get_si, send_typing_action
@@ -237,7 +237,7 @@ class PlayerHandlers(BaseHandlers):
                     )
                 message += "\n"
 
-        message += BOT_NAME
+        message += BOT_LINK
 
         update.message.reply_text(message, parse_mode="MarkdownV2")
         self.logger.info("{} requested stats".format(update.effective_user.first_name))
