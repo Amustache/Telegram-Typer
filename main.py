@@ -33,7 +33,7 @@ DB.connect()
 DB.create_tables([Player.Model])
 
 
-def get_user_stats(player_id: int) -> dict:
+def get_player_stats(player_id: int) -> dict:
     user, _ = Player.get_or_create(player_id)
 
     return {
@@ -108,12 +108,12 @@ def handler_debug(update: Update, context: CallbackContext) -> None:
 def handler_stats(update: Update, context: CallbackContext) -> None:
     logger.info("{} requested the stats".format(update.effective_user.first_name))
 
-    stats = get_user_stats(update.effective_user.id)
+    stats = get_player_stats(update.effective_user.id)
     message = "*📊 Stats 📊*\n_Stats of {} as of {}\._\n\n".format(
         update.effective_user.first_name, datetime.now().strftime("%B %d, %Y at %H:%M GMT\+1")
     )
 
-    user_achievements = get_user_achievements(update.effective_user.id)
+    user_achievements = get_player_achievements(update.effective_user.id)
     medals = Counter(
         [medal for id, (medal, _, _) in sorted(ACHIEVEMENTS.items()) if id in user_achievements]
     )
@@ -209,7 +209,7 @@ def handler_interface(update: Update, context: CallbackContext) -> None:
         return
 
     if update.callback_query and update.callback_query.data != "stop":  # Choices
-        stats = get_user_stats(id)
+        stats = get_player_stats(id)
         query = update.callback_query
         query.answer()
         data = query.data
@@ -234,7 +234,7 @@ def handler_interface(update: Update, context: CallbackContext) -> None:
                         exec("user.{} += qt".format(item))
                         exec("user.{}_total += qt".format(item))
                         user.save()
-                        stats = get_user_stats(id)
+                        stats = get_player_stats(id)
 
                         if 10 <= stats[item]["quantity"]:
                             ach = power_10(stats[item]["quantity"])
@@ -264,7 +264,7 @@ def handler_interface(update: Update, context: CallbackContext) -> None:
                             exec("user.{}_total += qt * quantity".format(currency))
                         exec("user.{} -= qt".format(item))
                         user.save()
-                        stats = get_user_stats(id)
+                        stats = get_player_stats(id)
 
                         update_player(id, context)
 
@@ -339,7 +339,7 @@ def handler_interface(update: Update, context: CallbackContext) -> None:
     else:  # Main
         logger.info("{} requested the interface".format(update.effective_user.first_name))
 
-        stats = get_user_stats(id)
+        stats = get_player_stats(id)
         choices = []
         for item, attrs in stats.items():  # e.g., "contacts": {"unlock_at", ...}
             if "unlock_at" in attrs and stats[item]["unlocked"]:
@@ -411,7 +411,7 @@ def handler_stop(update: Update, context: CallbackContext) -> None:
 
 def set_unlocks(player_id: int) -> None:
     user, _ = Player.get_or_create(player_id)
-    stats = get_user_stats(player_id)
+    stats = get_player_stats(player_id)
 
     for item, attrs in stats.items():  # e.g., "contacts": {"unlock_at", ...}
         if "unlock_at" in attrs and not stats[item]["unlocked"]:
@@ -465,14 +465,14 @@ def update_pinned_message(player_id: int, context: CallbackContext) -> None:
         remove_job_if_exists(str(player_id), context)
 
 
-def get_user_achievements(player_id: int) -> list:
+def get_player_achievements(player_id: int) -> list:
     user, _ = Player.get_or_create(player_id)
     return [int(num) for num in user.achievements.split(",") if num]
 
 
 def update_achievements(player_id: int, context: CallbackContext) -> None:
     user, _ = Player.get_or_create(player_id)
-    user_achievements = get_user_achievements(player_id)
+    user_achievements = get_player_achievements(player_id)
     data = list(set(Player.cache[player_id]["achievements"]))
     Player.cache[player_id]["achievements"] = []
     user.achievements = ",".join([str(num) for num in list(set(user_achievements + data))])
@@ -488,7 +488,7 @@ def update_achievements(player_id: int, context: CallbackContext) -> None:
 def handler_achievements(update: Update, context: CallbackContext) -> None:
     logger.info("{} requested the achievements".format(update.effective_user.first_name))
 
-    user_achievements = get_user_achievements(update.effective_user.id)
+    user_achievements = get_player_achievements(update.effective_user.id)
     question = "❔"
 
     if context.args:
@@ -564,7 +564,7 @@ def handler_quickmode(update: Update, context: CallbackContext) -> None:
 def update_messages_and_contacts_from_job(context: CallbackContext) -> None:
     player_id = context.job.context
     user, _ = Player.get_or_create(player_id)
-    stats = get_user_stats(player_id)
+    stats = get_player_stats(player_id)
 
     messages_to_add = 0
     contacts_to_add = 0
