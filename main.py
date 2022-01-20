@@ -5,49 +5,36 @@ from datetime import datetime
 from time import sleep
 import logging
 
-
 from peewee import BigIntegerField, CharField, FloatField, IntegerField, Model, SqliteDatabase
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, Update
 from telegram.error import BadRequest, RetryAfter
 from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler, Filters, MessageHandler, Updater
 
-
 from achievements import ACHIEVEMENTS, ACHIEVEMENTS_ID, MAX_ACHIEVEMENTS
 from parameters import DB_PATH, RESALE_PERCENTAGE, TIME_INTERVAL
 from secret import ADMIN_CHAT, BOT_NAME, BOT_TOKEN
 from tlgtyper.helpers import get_si, power_10, send_typing_action
-from tlgtyper.player import PlayerModel
-
+from tlgtyper.player import PlayerInstance
 
 # Enable logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 
+Player = PlayerInstance()
+
 logger = logging.getLogger(__name__)
 
 # Database
 DB = SqliteDatabase(DB_PATH)
 
-user_cache = defaultdict(
-    lambda: {
-        "from_chat": 0,
-        "achievements": [],
-        "cooldown": {"informed": False, "retryafter": 0, "counter": 0},
-    }
-)
-
-DB.bind([PlayerModel])
+DB.bind([Player.Model])
 DB.connect()
-DB.create_tables([PlayerModel])
-
-
-def get_or_create_user(id: int) -> PlayerModel:
-    return PlayerModel.get_or_create(id=id)
+DB.create_tables([Player.Model])
 
 
 def get_user_stats(id: int) -> dict:
-    user, _ = get_or_create_user(id)
+    user, _ = Player.get_or_create(id)
 
     return {
         "messages": {
@@ -97,7 +84,7 @@ def handler_notify(update: Update, context: CallbackContext) -> None:
     if update.effective_user.id == ADMIN_CHAT:
         if update.message.reply_to_message:
             logger.info("{} sent a global message.".format(update.effective_user.first_name))
-            for player in PlayerModel.select():
+            for player in Player.Model.select():
                 context.bot.send_message(player.id, update.message.reply_to_message.text)
         else:
             text_to_send = "🗣 Message from admin 🗣\n{}".format(
@@ -111,7 +98,7 @@ def handler_notify(update: Update, context: CallbackContext) -> None:
 def handler_debug(update: Update, context: CallbackContext) -> None:
     id = update.effective_user.id
     if id == ADMIN_CHAT:
-        user, _ = get_or_create_user(id)
+        user, _ = Player.get_or_create(id)
         user.messages += 10_000_000_000
         user.messages_total += 10_000_000_000
         user.save()
@@ -175,13 +162,13 @@ def handler_new(update: Update, context: CallbackContext) -> None:
     logger.info("{} started a new game".format(update.effective_user.first_name))
 
     _user = update.effective_user
-    user, created = get_or_create_user(_user.id)
+    user, created = Player.get_or_create(_user.id)
 
     if created:
         user.first_name = _user.first_name
         user.save()
 
-        user_cache[update.effective_user.id]["achievements"].append(
+        Player.cache[update.effective_user.id]["achievements"].append(
             ACHIEVEMENTS_ID["misc"]["start"]["id"]
         )
 
@@ -217,7 +204,7 @@ def handler_help(update: Update, context: CallbackContext) -> None:
 
 def handler_interface(update: Update, context: CallbackContext) -> None:
     id = update.effective_user.id
-    user, _ = get_or_create_user(id)
+    user, _ = Player.get_or_create(id)
     if update_cooldown_and_notify(id, context):
         return
 
@@ -252,14 +239,14 @@ def handler_interface(update: Update, context: CallbackContext) -> None:
                         if 10 <= stats[item]["quantity"]:
                             ach = power_10(stats[item]["quantity"])
                             while ach >= 10:
-                                user_cache[update.effective_user.id]["achievements"].append(
+                                Player.cache[update.effective_user.id]["achievements"].append(
                                     ACHIEVEMENTS_ID[item]["quantity{}".format(ach)]["id"]
                                 )
                                 ach //= 10
                         if 10 <= stats[item]["total"]:
                             ach = power_10(stats[item]["total"])
                             while ach >= 10:
-                                user_cache[update.effective_user.id]["achievements"].append(
+                                Player.cache[update.effective_user.id]["achievements"].append(
                                     ACHIEVEMENTS_ID[item]["total{}".format(ach)]["id"]
                                 )
                                 ach //= 10
@@ -381,9 +368,9 @@ def handler_interface(update: Update, context: CallbackContext) -> None:
 
 def update_cooldown_and_notify(id: int, context: CallbackContext) -> bool:
     set_cooldown(id)
-    retryafter = user_cache[id]["cooldown"]["retryafter"]
+    retryafter = Player.cache[id]["cooldown"]["retryafter"]
     if retryafter:
-        if not user_cache[id]["cooldown"]["informed"]:
+        if not Player.cache[id]["cooldown"]["informed"]:
             context.bot.send_message(
                 id,
                 "Oops! I have been a bit spammy...\nI have to wait about {} second{} before we can play again!".format(
@@ -396,22 +383,22 @@ def update_cooldown_and_notify(id: int, context: CallbackContext) -> bool:
 
 
 def set_cooldown(id: int, COUNTER_LIMIT=100) -> None:
-    if user_cache[id]["cooldown"]["counter"] >= COUNTER_LIMIT:
-        user_cache[id]["cooldown"]["retryafter"] = 3
-        user_cache[id]["cooldown"]["counter"] = 0
-    if user_cache[id]["cooldown"]["retryafter"]:
-        user_cache[id]["cooldown"]["retryafter"] -= 1
-    if user_cache[id]["cooldown"]["retryafter"] < 0:
-        user_cache[id]["cooldown"]["retryafter"] = 0
+    if Player.cache[id]["cooldown"]["counter"] >= COUNTER_LIMIT:
+        Player.cache[id]["cooldown"]["retryafter"] = 3
+        Player.cache[id]["cooldown"]["counter"] = 0
+    if Player.cache[id]["cooldown"]["retryafter"]:
+        Player.cache[id]["cooldown"]["retryafter"] -= 1
+    if Player.cache[id]["cooldown"]["retryafter"] < 0:
+        Player.cache[id]["cooldown"]["retryafter"] = 0
 
 
 def handler_stop(update: Update, context: CallbackContext) -> None:
     logger.info("{} deleted their account".format(update.effective_user.first_name))
 
     id = update.effective_user.id
-    obj = PlayerModel.get(PlayerModel.id == id)
+    obj = Player.Model.get(Player.Model.id == id)
     obj.delete_instance()
-    PlayerModel.delete().where(PlayerModel.id == id).execute()
+    Player.Model.delete().where(Player.Model.id == id).execute()
     remove_job_if_exists(str(id), context)
 
     try:
@@ -423,7 +410,7 @@ def handler_stop(update: Update, context: CallbackContext) -> None:
 
 
 def set_unlocks(id: int) -> None:
-    user, _ = get_or_create_user(id)
+    user, _ = Player.get_or_create(id)
     stats = get_user_stats(id)
 
     for item, attrs in stats.items():  # e.g., "contacts": {"unlock_at", ...}
@@ -437,11 +424,11 @@ def set_unlocks(id: int) -> None:
                 # Worst thing I ever wrote probably, sorry not sorry.
                 exec("user.{}_state = 1".format(item))
                 user.save()
-                user_cache[id]["achievements"].append(ACHIEVEMENTS_ID[item]["unlocked"]["id"])
+                Player.cache[id]["achievements"].append(ACHIEVEMENTS_ID[item]["unlocked"]["id"])
 
 
 def get_quantities(id: int) -> str:
-    user, _ = get_or_create_user(id)
+    user, _ = Player.get_or_create(id)
     message = "– 💬 Messages: {}".format(get_si(user.messages))
     if user.contacts_state:
         message += "\n– 📇 Contacts: {}".format(get_si(user.contacts))
@@ -456,7 +443,7 @@ def get_quantities(id: int) -> str:
 
 
 def update_pinned_message(id: int, context: CallbackContext) -> None:
-    user, _ = get_or_create_user(id)
+    user, _ = Player.get_or_create(id)
     if update_cooldown_and_notify(id, context):
         return
 
@@ -467,7 +454,7 @@ def update_pinned_message(id: int, context: CallbackContext) -> None:
     except RetryAfter as e:
         logger.error(str(e))
         retryafter = int(str(e).split("in ")[1].split(".0")[0])
-        user_cache[id]["cooldown"]["retryafter"] = retryafter
+        Player.cache[id]["cooldown"]["retryafter"] = retryafter
     except BadRequest as e:  # Edit problem
         context.bot.send_message(
             id,
@@ -479,15 +466,15 @@ def update_pinned_message(id: int, context: CallbackContext) -> None:
 
 
 def get_user_achievements(id: int) -> list:
-    user, _ = get_or_create_user(id)
+    user, _ = Player.get_or_create(id)
     return [int(num) for num in user.achievements.split(",") if num]
 
 
 def update_achievements(id: int, context: CallbackContext) -> None:
-    user, _ = get_or_create_user(id)
+    user, _ = Player.get_or_create(id)
     user_achievements = get_user_achievements(id)
-    data = list(set(user_cache[id]["achievements"]))
-    user_cache[id]["achievements"] = []
+    data = list(set(Player.cache[id]["achievements"]))
+    Player.cache[id]["achievements"] = []
     user.achievements = ",".join([str(num) for num in list(set(user_achievements + data))])
     user.save()
 
@@ -529,7 +516,7 @@ def handler_achievements(update: Update, context: CallbackContext) -> None:
             "{:02X}: {}".format(id, medal if id in user_achievements else question)
             for id, (medal, _, _) in sorted(ACHIEVEMENTS.items())
         ]
-        things = [things[i : i + 5] for i in range(0, len(things), 5)]
+        things = [things[i: i + 5] for i in range(0, len(things), 5)]
         message = "*🌟 Achievements 🌟*\n\n"
         message += "\n".join([", ".join(text) for text in things])
         message += "\n\nUse `/achievement number` to have more information\."
@@ -553,15 +540,15 @@ def handler_answer(update: Update, context: CallbackContext) -> None:
     try:
         update.message.reply_text(update.message.text)  # TODO
         if update.message.text == "J'aime les loutres":
-            user_cache[update.effective_user.id]["achievements"].append(
+            Player.cache[update.effective_user.id]["achievements"].append(
                 ACHIEVEMENTS_ID["misc"]["loutres"]["id"]
             )
-        user_cache[update.effective_user.id]["from_chat"] += 2
-        user_cache[id]["cooldown"]["counter"] += 1
+        Player.cache[update.effective_user.id]["from_chat"] += 2
+        Player.cache[id]["cooldown"]["counter"] += 1
     except RetryAfter as e:
         logger.error(str(e))
         retryafter = int(e.split("in ")[1].split(".0")[0])
-        user_cache[id]["cooldown"]["retryafter"] = retryafter
+        Player.cache[id]["cooldown"]["retryafter"] = retryafter
 
 
 def handler_quickmode(update: Update, context: CallbackContext) -> None:
@@ -575,15 +562,15 @@ def handler_quickmode(update: Update, context: CallbackContext) -> None:
 
 
 def update_messages_and_contacts_from_job(context: CallbackContext) -> None:
-    id = context.job.context
-    user, _ = get_or_create_user(id)
-    stats = get_user_stats(id)
+    player_id = context.job.context
+    user, _ = Player.get_or_create(player_id)
+    stats = get_user_stats(player_id)
 
     messages_to_add = 0
     contacts_to_add = 0
 
-    messages_to_add += user_cache[id]["from_chat"]
-    user_cache[id]["from_chat"] = 0
+    messages_to_add += Player.cache[player_id]["from_chat"]
+    Player.cache[player_id]["from_chat"] = 0
 
     for item, attrs in stats.items():
         if "unlocked" in attrs and stats[item]["unlocked"]:
@@ -603,33 +590,33 @@ def update_messages_and_contacts_from_job(context: CallbackContext) -> None:
         if 10 <= user.messages:
             ach = power_10(user.messages)
             while ach >= 10:
-                user_cache[id]["achievements"].append(
+                Player.cache[player_id]["achievements"].append(
                     ACHIEVEMENTS_ID["messages"]["quantity{}".format(ach)]["id"]
                 )
                 ach //= 10
         if 10 <= user.messages_total:
             ach = power_10(user.messages_total)
             while ach >= 10:
-                user_cache[id]["achievements"].append(
+                Player.cache[player_id]["achievements"].append(
                     ACHIEVEMENTS_ID["messages"]["total{}".format(ach)]["id"]
                 )
                 ach //= 10
         if 10 <= user.contacts:
             ach = power_10(user.contacts)
             while ach >= 10:
-                user_cache[id]["achievements"].append(
+                Player.cache[player_id]["achievements"].append(
                     ACHIEVEMENTS_ID["contacts"]["quantity{}".format(ach)]["id"]
                 )
                 ach //= 10
         if 10 <= user.contacts_total:
             ach = power_10(user.contacts_total)
             while ach >= 10:
-                user_cache[id]["achievements"].append(
+                Player.cache[player_id]["achievements"].append(
                     ACHIEVEMENTS_ID["contacts"]["total{}".format(ach)]["id"]
                 )
                 ach //= 10
 
-        update_player(id, context)
+        update_player(player_id, context)
 
 
 def remove_job_if_exists(name: str, context: CallbackContext) -> bool:
@@ -652,7 +639,7 @@ def update_job(id: int, context: CallbackContext) -> None:
 
 
 def start_all_jobs(dispatcher) -> None:
-    for user in PlayerModel.select():
+    for user in Player.Model.select():
         id = user.id
         try:
             remove_job_if_exists(str(id), dispatcher)
