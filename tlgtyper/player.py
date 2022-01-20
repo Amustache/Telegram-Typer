@@ -54,12 +54,14 @@ class Players:
 
     def get_stats(self, player_id):
         player, _ = self.get_or_create(player_id)
+        scope = locals()
+        print(scope)
 
         result = {
             item: {**attrs, **{
-                "unlocked": 0,  # eval("player.{}_state".format(item)),
-                "quantity": 0,  # eval("player.{}".format(item)),
-                "total": 0,  # eval("player.{}_total".format(item)),
+                "unlocked": eval("player.{}_state".format(item), scope),
+                "quantity": eval("player.{}".format(item), scope),
+                "total": eval("player.{}_total".format(item), scope),
             }}
             for item, attrs in ITEMS.items()
         }
