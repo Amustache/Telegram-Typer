@@ -95,16 +95,6 @@ def handler_notify(update: Update, context: CallbackContext) -> None:
             )
 
 
-def handler_debug(update: Update, context: CallbackContext) -> None:
-    id = update.effective_user.id
-    if id == ADMIN_CHAT:
-        user, _ = Player.get_or_create(id)
-        user.messages += 10_000_000_000
-        user.messages_total += 10_000_000_000
-        user.save()
-    update.message.reply_text("Sent 10\_000\_000\_000 messages\.", parse_mode="MarkdownV2")
-
-
 def handler_stats(update: Update, context: CallbackContext) -> None:
     logger.info("{} requested the stats".format(update.effective_user.first_name))
 
@@ -649,14 +639,18 @@ def start_all_jobs(dispatcher) -> None:
         except (IndexError, ValueError):
             pass
 
+from tlgtyper.handlers import Admin
+
 
 def main() -> None:
     updater = Updater(BOT_TOKEN)
     dispatcher = updater.dispatcher
 
     # Commands
+    Admin(Player, logger).add_commands(dispatcher)
+
     dispatcher.add_handler(CommandHandler("start", handler_start))
-    dispatcher.add_handler(CommandHandler("debug", handler_debug))
+    # dispatcher.add_handler(CommandHandler("debug", add_messages))
     dispatcher.add_handler(CommandHandler(["new_game", "new"], handler_new))
     dispatcher.add_handler(CommandHandler("help", handler_help))
     dispatcher.add_handler(
