@@ -33,8 +33,8 @@ DB.connect()
 DB.create_tables([Player.Model])
 
 
-def get_user_stats(id: int) -> dict:
-    user, _ = Player.get_or_create(id)
+def get_user_stats(player_id: int) -> dict:
+    user, _ = Player.get_or_create(player_id)
 
     return {
         "messages": {
@@ -366,13 +366,13 @@ def handler_interface(update: Update, context: CallbackContext) -> None:
             update.message.reply_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
 
 
-def update_cooldown_and_notify(id: int, context: CallbackContext) -> bool:
-    set_cooldown(id)
-    retryafter = Player.cache[id]["cooldown"]["retryafter"]
+def update_cooldown_and_notify(player_id: int, context: CallbackContext) -> bool:
+    set_cooldown(player_id)
+    retryafter = Player.cache[player_id]["cooldown"]["retryafter"]
     if retryafter:
-        if not Player.cache[id]["cooldown"]["informed"]:
+        if not Player.cache[player_id]["cooldown"]["informed"]:
             context.bot.send_message(
-                id,
+                player_id,
                 "Oops! I have been a bit spammy...\nI have to wait about {} second{} before we can play again!".format(
                     retryafter, "s" if retryafter > 1 else ""
                 ),
@@ -382,14 +382,14 @@ def update_cooldown_and_notify(id: int, context: CallbackContext) -> bool:
         return False
 
 
-def set_cooldown(id: int, COUNTER_LIMIT=100) -> None:
-    if Player.cache[id]["cooldown"]["counter"] >= COUNTER_LIMIT:
-        Player.cache[id]["cooldown"]["retryafter"] = 3
-        Player.cache[id]["cooldown"]["counter"] = 0
-    if Player.cache[id]["cooldown"]["retryafter"]:
-        Player.cache[id]["cooldown"]["retryafter"] -= 1
-    if Player.cache[id]["cooldown"]["retryafter"] < 0:
-        Player.cache[id]["cooldown"]["retryafter"] = 0
+def set_cooldown(player_id: int, COUNTER_LIMIT=100) -> None:
+    if Player.cache[player_id]["cooldown"]["counter"] >= COUNTER_LIMIT:
+        Player.cache[player_id]["cooldown"]["retryafter"] = 3
+        Player.cache[player_id]["cooldown"]["counter"] = 0
+    if Player.cache[player_id]["cooldown"]["retryafter"]:
+        Player.cache[player_id]["cooldown"]["retryafter"] -= 1
+    if Player.cache[player_id]["cooldown"]["retryafter"] < 0:
+        Player.cache[player_id]["cooldown"]["retryafter"] = 0
 
 
 def handler_stop(update: Update, context: CallbackContext) -> None:
@@ -409,9 +409,9 @@ def handler_stop(update: Update, context: CallbackContext) -> None:
     update.message.reply_text("Game stopped, account deleted.")  # TODO
 
 
-def set_unlocks(id: int) -> None:
-    user, _ = Player.get_or_create(id)
-    stats = get_user_stats(id)
+def set_unlocks(player_id: int) -> None:
+    user, _ = Player.get_or_create(player_id)
+    stats = get_user_stats(player_id)
 
     for item, attrs in stats.items():  # e.g., "contacts": {"unlock_at", ...}
         if "unlock_at" in attrs and not stats[item]["unlocked"]:
@@ -424,11 +424,11 @@ def set_unlocks(id: int) -> None:
                 # Worst thing I ever wrote probably, sorry not sorry.
                 exec("user.{}_state = 1".format(item))
                 user.save()
-                Player.cache[id]["achievements"].append(ACHIEVEMENTS_ID[item]["unlocked"]["id"])
+                Player.cache[player_id]["achievements"].append(ACHIEVEMENTS_ID[item]["unlocked"]["id"])
 
 
-def get_quantities(id: int) -> str:
-    user, _ = Player.get_or_create(id)
+def get_quantities(player_id: int) -> str:
+    user, _ = Player.get_or_create(player_id)
     message = "– 💬 Messages: {}".format(get_si(user.messages))
     if user.contacts_state:
         message += "\n– 📇 Contacts: {}".format(get_si(user.contacts))
@@ -442,39 +442,39 @@ def get_quantities(id: int) -> str:
     return message
 
 
-def update_pinned_message(id: int, context: CallbackContext) -> None:
-    user, _ = Player.get_or_create(id)
-    if update_cooldown_and_notify(id, context):
+def update_pinned_message(player_id: int, context: CallbackContext) -> None:
+    user, _ = Player.get_or_create(player_id)
+    if update_cooldown_and_notify(player_id, context):
         return
 
-    message = get_quantities(id)
+    message = get_quantities(player_id)
 
     try:
-        context.bot.edit_message_text(message, id, user.pinned_message)
+        context.bot.edit_message_text(message, player_id, user.pinned_message)
     except RetryAfter as e:
         logger.error(str(e))
         retryafter = int(str(e).split("in ")[1].split(".0")[0])
-        Player.cache[id]["cooldown"]["retryafter"] = retryafter
+        Player.cache[player_id]["cooldown"]["retryafter"] = retryafter
     except BadRequest as e:  # Edit problem
         context.bot.send_message(
-            id,
+            player_id,
             "Oops\! It seems like I did not find the pinned message\. Could you use /new\_game again, please\?",
             parse_mode="MarkdownV2",
         )
         logger.error(str(e))
-        remove_job_if_exists(str(id), context)
+        remove_job_if_exists(str(player_id), context)
 
 
-def get_user_achievements(id: int) -> list:
-    user, _ = Player.get_or_create(id)
+def get_user_achievements(player_id: int) -> list:
+    user, _ = Player.get_or_create(player_id)
     return [int(num) for num in user.achievements.split(",") if num]
 
 
-def update_achievements(id: int, context: CallbackContext) -> None:
-    user, _ = Player.get_or_create(id)
-    user_achievements = get_user_achievements(id)
-    data = list(set(Player.cache[id]["achievements"]))
-    Player.cache[id]["achievements"] = []
+def update_achievements(player_id: int, context: CallbackContext) -> None:
+    user, _ = Player.get_or_create(player_id)
+    user_achievements = get_user_achievements(player_id)
+    data = list(set(Player.cache[player_id]["achievements"]))
+    Player.cache[player_id]["achievements"] = []
     user.achievements = ",".join([str(num) for num in list(set(user_achievements + data))])
     user.save()
 
@@ -482,7 +482,7 @@ def update_achievements(id: int, context: CallbackContext) -> None:
         if achievement not in user_achievements:
             medal, title, text = ACHIEVEMENTS[achievement]
             message = "*{} {} {}*\n_{}_".format(medal, title, medal, text)
-            context.bot.send_message(id, message, parse_mode="MarkdownV2")
+            context.bot.send_message(player_id, message, parse_mode="MarkdownV2")
 
 
 def handler_achievements(update: Update, context: CallbackContext) -> None:
@@ -524,11 +524,11 @@ def handler_achievements(update: Update, context: CallbackContext) -> None:
         update.message.reply_text(message, parse_mode="MarkdownV2")
 
 
-def update_player(id: int, context: CallbackContext) -> None:
-    set_cooldown(id)
-    set_unlocks(id)
-    update_pinned_message(id, context)
-    update_achievements(id, context)
+def update_player(player_id: int, context: CallbackContext) -> None:
+    set_cooldown(player_id)
+    set_unlocks(player_id)
+    update_pinned_message(player_id, context)
+    update_achievements(player_id, context)
 
 
 @send_typing_action
@@ -628,11 +628,11 @@ def remove_job_if_exists(name: str, context: CallbackContext) -> bool:
     return True
 
 
-def update_job(id: int, context: CallbackContext) -> None:
+def update_job(player_id: int, context: CallbackContext) -> None:
     try:
-        remove_job_if_exists(str(id), context)
+        remove_job_if_exists(str(player_id), context)
         context.job_queue.run_repeating(
-            update_messages_and_contacts_from_job, TIME_INTERVAL, context=id, name=str(id)
+            update_messages_and_contacts_from_job, TIME_INTERVAL, context=player_id, name=str(player_id)
         )
     except (IndexError, ValueError):
         return
