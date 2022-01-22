@@ -37,16 +37,35 @@ ITEMS = {
     },
 }
 
+UPGRADES = {
+    "messages": {None},
+    "contacts": {
+        0x01: {
+            "title": "Test",
+            "text": "Contacts are twice as efficient\!",
+            "effect": lambda x: 2 * x,
+        },
+    },
+}
 
-def get_price(base_price: int, cur_items: int) -> float:
+
+def accumulate_upgrades(item: str, upgrades_ids: str, base_value: int) -> float:
+    if upgrades_ids:
+        upgrades_ids = [int(upgrade_id) for upgrade_id in upgrades_ids.split(",") if upgrade_id]
+        result = base_value
+        for fun in [UPGRADES[item][upgrade_id]["effect"] for upgrade_id in upgrades_ids]:
+            result = fun(result)
+        return result
+    return base_value
+
+
+def get_price(base_price: int, cur_items: int) -> int:
     return ceil(base_price * FACTOR ** cur_items)
 
 
-def get_price_for_n(base_price: int, cur_items: int, wanted_items: int) -> float:
+def get_price_for_n(base_price: int, cur_items: int, wanted_items: int) -> int:
     # See https://en.wikipedia.org/wiki/Geometric_progression#Geometric_series
-    return ceil(
-        base_price * ((FACTOR ** cur_items) - (FACTOR ** (cur_items + wanted_items))) / (1 - FACTOR)
-    )
+    return ceil(base_price * ((FACTOR ** cur_items) - (FACTOR ** (cur_items + wanted_items))) / (1 - FACTOR))
 
 
 def get_max_to_buy(base_price: int, cur_items: int, max_price: int) -> int:

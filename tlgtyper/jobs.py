@@ -4,6 +4,7 @@ from telegram.ext import CallbackContext
 from parameters import TIME_INTERVAL
 from tlgtyper.achievements import ACHIEVEMENTS_ID
 from tlgtyper.helpers import power_10
+from tlgtyper.items import accumulate_upgrades
 
 
 def remove_job_if_exists(name: str, context: CallbackContext) -> bool:
@@ -56,8 +57,14 @@ def update_messages_and_contacts_from_job(context: CallbackContext) -> None:
 
     for item, attrs in stats.items():
         if "unlock_at" in attrs and stats[item]["unlocked"]:
-            messages_to_add += stats[item]["gain"]["messages"] * stats[item]["quantity"]
-            contacts_to_add += stats[item]["gain"]["contacts"] * stats[item]["quantity"]
+            messages_to_add += (
+                accumulate_upgrades(item, stats[item]["upgrades"], stats[item]["gain"]["messages"])
+                * stats[item]["quantity"]
+            )
+            contacts_to_add += (
+                accumulate_upgrades(item, stats[item]["upgrades"], stats[item]["gain"]["contacts"])
+                * stats[item]["quantity"]
+            )
 
     messages_to_add = int(messages_to_add)
     contacts_to_add = int(contacts_to_add)

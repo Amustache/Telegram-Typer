@@ -24,24 +24,29 @@ class Players:
         messages = FloatField(default=0)
         messages_state = IntegerField(default=1)  # Unlocked by default
         messages_total = FloatField(default=0)
+        messages_upgrades = CharField(default="")  # "xx,yy"
 
         contacts = FloatField(default=0)
         contacts_state = IntegerField(default=0)
         contacts_total = FloatField(default=0)
+        contacts_upgrades = CharField(default="")  # "xx,yy"
 
         groups = FloatField(default=0)
         groups_state = IntegerField(default=0)
         groups_total = FloatField(default=0)
+        groups_upgrades = CharField(default="")  # "xx,yy"
 
         channels = FloatField(default=0)
         channels_state = IntegerField(default=0)
         channels_total = FloatField(default=0)
+        channels_upgrades = CharField(default="")  # "xx,yy"
 
         supergroups = FloatField(default=0)
         supergroups_state = IntegerField(default=0)
         supergroups_total = FloatField(default=0)
+        supergroups_upgrades = CharField(default="")  # "xx,yy"
 
-        achievements = CharField(default="")
+        achievements = CharField(default="")  # "xx,yy"
 
     cache = defaultdict(
         lambda: {
@@ -65,6 +70,7 @@ class Players:
                     "unlocked": eval("player.{}_state".format(item), scope),
                     "quantity": eval("player.{}".format(item), scope),
                     "total": eval("player.{}_total".format(item), scope),
+                    "upgrades": eval("player.{}_upgrades".format(item), scope),
                 },
             }
             for item, attrs in ITEMS.items()
@@ -85,18 +91,14 @@ class Players:
         for item, attrs in stats.items():  # e.g., "contacts": {"unlock_at", ...}
             if "unlock_at" in attrs and not stats[item]["unlocked"]:
                 unlock = True
-                for unlock_item, unlock_quantity in attrs[
-                    "unlock_at"
-                ].items():  # e.g., "messages": 10
+                for unlock_item, unlock_quantity in attrs["unlock_at"].items():  # e.g., "messages": 10
                     if stats[unlock_item]["total"] < unlock_quantity:
                         unlock = False
                         break
                 if unlock:
                     exec("player.{}_state = 1".format(item))
                     player.save()
-                    Players.cache[player_id]["achievements"].append(
-                        ACHIEVEMENTS_ID[item]["unlocked"]["id"]
-                    )
+                    Players.cache[player_id]["achievements"].append(ACHIEVEMENTS_ID[item]["unlocked"]["id"])
 
     def update_pinned_message(
         self, player_id: int, context: CallbackContext
