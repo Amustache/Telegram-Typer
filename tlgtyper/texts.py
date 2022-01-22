@@ -35,15 +35,11 @@ BLABLA_TEXT = [
 
 
 def get_quantities(player_id: int, players_instance) -> str:
-    user, _ = players_instance.get_or_create(player_id)
-    message = "– 💬 Messages: {}".format(get_si(user.messages))
-    if user.contacts_state:
-        message += "\n– 📇 Contacts: {}".format(get_si(user.contacts))
-    if user.groups_state:
-        message += "\n– 👥 Groups: {}".format(get_si(user.groups))
-    if user.channels_state:
-        message += "\n– 📰 Channels: {}".format(get_si(user.channels))
-    if user.supergroups_state:
-        message += "\n– 👥 Supergroups: {}".format(get_si(user.supergroups))
+    stats = players_instance.get_stats(player_id)
+
+    message = "– {} Messages: {}".format(stats["messages"]["symbol"], get_si(stats["messages"]["quantity"]))
+    for item, attrs in stats.items():  # e.g., "contacts": {"unlock_at", ...}
+        if "unlock_at" in attrs and stats[item]["unlocked"]:
+            message += "\n– {} {}: {}".format(stats[item]["symbol"], item.capitalize(), get_si(stats[item]["quantity"]))
 
     return message
