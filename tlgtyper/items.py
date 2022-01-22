@@ -1,3 +1,6 @@
+from math import ceil, floor, log
+
+
 from parameters import FACTOR
 
 
@@ -36,9 +39,16 @@ ITEMS = {
 
 
 def get_price(base_price: int, cur_items: int) -> float:
-    return base_price * FACTOR ** cur_items
+    return ceil(base_price * FACTOR ** cur_items)
 
 
 def get_price_for_n(base_price: int, cur_items: int, wanted_items: int) -> float:
     # See https://en.wikipedia.org/wiki/Geometric_progression#Geometric_series
-    return base_price * ((FACTOR ** cur_items) - (FACTOR ** wanted_items)) / (1 - FACTOR)
+    return ceil(
+        base_price * ((FACTOR ** cur_items) - (FACTOR ** (cur_items + wanted_items))) / (1 - FACTOR)
+    )
+
+
+def get_max_to_buy(base_price: int, cur_items: int, max_price: int) -> int:
+    value = 1 - (max_price / base_price) * (1 - FACTOR) / (FACTOR ** cur_items)
+    return floor(log(value, FACTOR))
