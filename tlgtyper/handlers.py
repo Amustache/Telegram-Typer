@@ -8,7 +8,7 @@ import os
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, Update
 from telegram.error import BadRequest, RetryAfter
-from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler, Filters, MessageHandler
+from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler, ConversationHandler, Filters, MessageHandler
 
 
 from parameters import CAP, RESALE_PERCENTAGE
@@ -16,7 +16,7 @@ from secret import ADMIN_CHAT, BOT_LINK
 from tlgtyper.achievements import ACHIEVEMENTS, ACHIEVEMENTS_ID, MAX_ACHIEVEMENTS
 from tlgtyper.cooldown import update_cooldown_and_notify
 from tlgtyper.helpers import get_si, power_10
-from tlgtyper.items import get_max_to_buy, get_price_for_n
+from tlgtyper.items import get_max_to_buy, get_price_for_n, ITEMS
 from tlgtyper.jobs import remove_job_if_exists, update_job
 from tlgtyper.texts import get_quantities, HELP_COMMANDS
 
@@ -74,6 +74,42 @@ class BaseHandlers:
         return commands
 
 
+class AdminHandlers(BaseHandlers):
+    def __init__(self, players_instance, logger=None, media_folder=None):
+        command_handlers = [
+            CommandHandler(["debug", "cheat", "rich"], self.be_rich),
+            CommandHandler(["notify"], self.notify_all),
+        ]
+        super().__init__(
+            command_handlers=command_handlers,
+            players_instance=players_instance,
+            logger=logger,
+            media_folder=media_folder,
+        )
+
+    def be_rich(self, update: Update, context: CallbackContext) -> None:
+        player_id = update.effective_user.id
+        if player_id == ADMIN_CHAT:
+            player, _ = self.players_instance.get_or_create(player_id)
+            player.messages += 10_000_000_000
+            player.messages_total += 10_000_000_000
+            player.save()
+        update.message.reply_text("Sent 10'000'000'000 messages.")
+        self.logger.info("{} cheated.".format(update.effective_user.first_name))
+
+    def notify_all(self, update: Update, context: CallbackContext) -> None:
+        if update.effective_user.id == ADMIN_CHAT:
+            if update.message.reply_to_message:
+                for player in self.players_instance.Model.select():
+                    context.bot.send_message(player.id, update.message.reply_to_message.text)
+                self.logger.info("{} sent a global message.".format(update.effective_user.first_name))
+            else:
+                text_to_send = "🗣 Message from admin 🗣\n{}".format(update.effective_message.text.split(" ", 1)[1])
+                update.message.reply_text("This is a preview:").reply_text(text_to_send).reply_text(
+                    "Reply /notify to the previous message to send it."
+                )
+
+
 class PlayerHandlers(BaseHandlers):
     def __init__(self, players_instance, logger=None, media_folder=None):
         command_handlers = [
@@ -85,8 +121,8 @@ class PlayerHandlers(BaseHandlers):
             CommandHandler(["stop", "stop_game", "end", "end_game"], self.stop_bot),
             CommandHandler(["achievements", "achievement"], self.show_achievements),
             CommandHandler(["stats", "stat"], self.show_stats),
-            CommandHandler(["interface", "buy", "sell", "join", "leave"], self.interface),
-            CallbackQueryHandler(self.interface),
+            # CommandHandler(["interface", "buy", "sell", "join", "leave"], self.interface),
+            # CallbackQueryHandler(self.interface),
         ]
         super().__init__(
             command_handlers=command_handlers,
@@ -446,12 +482,29 @@ class PlayerHandlers(BaseHandlers):
                 update.message.reply_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
 
 
-class AdminHandlers(BaseHandlers):
+STATE_MAIN, STATE_BUY_SELL, STATE_UPGRADES, STATE_TOOLS = range(4)
+
+
+class PlayerInterfaceHandlers(BaseHandlers):
     def __init__(self, players_instance, logger=None, media_folder=None):
         command_handlers = [
-            CommandHandler(["debug", "cheat", "rich"], self.be_rich),
-            CommandHandler(["notify"], self.notify_all),
-            CallbackQueryHandler(self.notify_all),
+            ConversationHandler(
+                entry_points=[CommandHandler(["interface"], self.interface)],
+                states={
+                    STATE_MAIN: [
+                        CallbackQueryHandler(self.buy_sell, pattern="^{}$".format(STATE_BUY_SELL)),
+                        # CallbackQueryHandler(self.upgrades, pattern="^{}$".format(STATE_UPGRADES)),
+                        # CallbackQueryHandler(self.tools, pattern="^{}$".format(STATE_TOOLS)),
+                    ],
+                    STATE_BUY_SELL: [
+                        CallbackQueryHandler(self.buy_sell, pattern="^{}[a-z]?(1|10|max)?$".format(STATE_BUY_SELL)),
+                        CallbackQueryHandler(self.interface, pattern="^{}$".format(STATE_MAIN)),
+                    ],
+                    # STATE_UPGRADES: [],
+                    # STATE_TOOLS: [],
+                },
+                fallbacks=[CommandHandler(["advinterface"], self.interface)],
+            ),
         ]
         super().__init__(
             command_handlers=command_handlers,
@@ -460,24 +513,72 @@ class AdminHandlers(BaseHandlers):
             media_folder=media_folder,
         )
 
-    def be_rich(self, update: Update, context: CallbackContext) -> None:
+    def interface(self, update: Update, context: CallbackContext):
         player_id = update.effective_user.id
-        if player_id == ADMIN_CHAT:
-            player, _ = self.players_instance.get_or_create(player_id)
-            player.messages += 10_000_000_000
-            player.messages_total += 10_000_000_000
-            player.save()
-        update.message.reply_text("Sent 10'000'000'000 messages.")
-        self.logger.info("{} cheated.".format(update.effective_user.first_name))
+        player, _ = self.players_instance.get_or_create(player_id)
+        if update_cooldown_and_notify(player_id, self.players_instance, context):
+            return
 
-    def notify_all(self, update: Update, context: CallbackContext) -> None:
-        if update.effective_user.id == ADMIN_CHAT:
-            if update.message.reply_to_message:
-                for player in self.players_instance.Model.select():
-                    context.bot.send_message(player.id, update.message.reply_to_message.text)
-                self.logger.info("{} sent a global message.".format(update.effective_user.first_name))
+        reply_markup = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("Buy/Sell", callback_data=str(STATE_BUY_SELL)),
+                ],
+                [
+                    InlineKeyboardButton("Upgrades", callback_data=str(STATE_UPGRADES)),
+                ],
+                [
+                    InlineKeyboardButton("Tools", callback_data=str(STATE_TOOLS)),
+                ],
+            ]
+        )
+
+        message = "Main menu"
+
+        if update.callback_query:
+            query = update.callback_query
+            query.answer()
+            update.callback_query.edit_message_text(message, reply_markup=reply_markup)
+        else:
+            update.message.reply_text(message, reply_markup=reply_markup)
+
+        self.logger.info("{} requested the interface".format(update.effective_user.first_name))
+
+        return STATE_MAIN
+
+    def buy_sell(self, update: Update, context: CallbackContext):
+        player_id = update.effective_user.id
+        query = update.callback_query
+        query.answer()
+        data = query.data
+
+        # Main
+        if data == str(STATE_BUY_SELL):
+            stats = self.players_instance.get_stats(player_id)
+            choices = []
+            for item, attrs in stats.items():  # e.g., "contacts": {"unlock_at", ...}
+                if "unlock_at" in attrs and stats[item]["unlocked"]:
+                    choices.append(
+                        InlineKeyboardButton(
+                            item.capitalize(), callback_data="{}{}x".format(STATE_BUY_SELL, stats[item]["id"])
+                        )
+                    )
+
+            if choices:
+                message = "*🧮 Interface 🧮*\n\n"
+                message += get_quantities(player_id, self.players_instance)
+                message += "\n\nSelect what you would like to bargain:"
+                choices = [choices[i : i + 2] for i in range(0, len(choices), 2)]
             else:
-                text_to_send = "🗣 Message from admin 🗣\n{}".format(update.effective_message.text.split(" ", 1)[1])
-                update.message.reply_text("This is a preview:").reply_text(text_to_send).reply_text(
-                    "Reply /notify to the previous message to send it."
-                )
+                message = "*Interface*\n\nYou don't have enough messages for now\.\.\."
+
+            choices.append([InlineKeyboardButton("Back", callback_data=str(STATE_MAIN))])
+            reply_markup = InlineKeyboardMarkup(choices)
+
+            update.callback_query.edit_message_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
+
+        # Choice has been made
+        else:
+            data = data[1:]
+
+        return STATE_BUY_SELL

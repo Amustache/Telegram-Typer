@@ -9,7 +9,7 @@ from telegram.ext import Updater
 
 from parameters import DB_PATH
 from secret import BOT_TOKEN
-from tlgtyper.handlers import AdminHandlers, PlayerHandlers
+from tlgtyper.handlers import AdminHandlers, PlayerHandlers, PlayerInterfaceHandlers
 from tlgtyper.jobs import start_all_jobs
 from tlgtyper.player import Players
 
@@ -32,6 +32,7 @@ def main() -> None:
 
     # Commands
     PlayerHandlers(Players, logger, media_folder="./img").add_commands(dispatcher)
+    PlayerInterfaceHandlers(Players, logger).add_commands(dispatcher)
     AdminHandlers(Players, logger).add_commands(dispatcher)
 
     commands = ""
