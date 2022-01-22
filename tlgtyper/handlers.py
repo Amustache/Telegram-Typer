@@ -307,180 +307,6 @@ class PlayerHandlers(BaseHandlers):
             update.message.reply_text(message, parse_mode="MarkdownV2")
         self.logger.info("{} requested achievements".format(update.effective_user.first_name))
 
-    def interface(self, update: Update, context: CallbackContext):
-        player_id = update.effective_user.id
-        player, _ = self.players_instance.get_or_create(player_id)
-        if update_cooldown_and_notify(player_id, self.players_instance, context):
-            return
-
-        # The choice has been made
-        if update.callback_query and update.callback_query.data != "stop":  # Choices
-            stats = self.players_instance.get_stats(player_id)
-            query = update.callback_query
-            query.answer()
-            data = query.data
-
-            for item, attrs in stats.items():
-                if "id" in attrs:
-                    if data[0] == attrs["id"]:
-                        base_prices = stats[item]["base_price"]
-                        sell_price = {
-                            currency: int(price * RESALE_PERCENTAGE) for currency, price in base_prices.items()
-                        }
-
-                        # Buy
-                        if data[1] == "b":
-                            if data[2:] == "1":
-                                qt = 1
-                            elif data[2:] == "10":
-                                qt = 10
-                            else:
-                                qt = CAP
-                                for currency, price in base_prices.items():
-                                    loss = get_max_to_buy(price, stats[item]["quantity"], stats[currency]["quantity"])
-                                    qt = min(qt, loss)
-                            for currency, price in base_prices.items():
-                                loss = get_price_for_n(price, stats[item]["quantity"], qt)
-                                exec("player.{} -= loss".format(currency))
-                            exec("player.{} += qt".format(item))
-                            exec("player.{}_total += qt".format(item))
-                            player.save()
-                            stats = self.players_instance.get_stats(player_id)
-
-                            if 10 <= stats[item]["quantity"]:
-                                ach = power_10(stats[item]["quantity"])
-                                while ach >= 10:
-                                    self.players_instance.cache[update.effective_user.id]["achievements"].append(
-                                        ACHIEVEMENTS_ID[item]["quantity{}".format(ach)]["id"]
-                                    )
-                                    ach //= 10
-                            if 10 <= stats[item]["total"]:
-                                ach = power_10(stats[item]["total"])
-                                while ach >= 10:
-                                    self.players_instance.cache[update.effective_user.id]["achievements"].append(
-                                        ACHIEVEMENTS_ID[item]["total{}".format(ach)]["id"]
-                                    )
-                                    ach //= 10
-
-                            self.players_instance.update(player_id, context)
-                        # Sell
-                        elif data[1] == "s":
-                            if data[2:] == "1":
-                                qt = 1
-                            elif data[2:] == "10":
-                                qt = 10
-                            else:
-                                qt = stats[item]["quantity"]
-                            for currency, price in sell_price.items():
-                                gain = get_price_for_n(price, stats[item]["quantity"], -qt)
-                                exec("player.{} += gain".format(currency))
-                                exec("player.{}_total += gain".format(currency))
-                            exec("player.{} -= qt".format(item))
-                            player.save()
-                            stats = self.players_instance.get_stats(player_id)
-
-                            self.players_instance.update(player_id, context)
-
-                        message = "*🧮 Interface 🧮*\n\n*{}*\n".format(item.capitalize())
-                        message += "You have {} {}\.\n".format(get_si(stats[item]["quantity"]), item)
-                        message += "📈 Join 1:"
-                        for currency, price in base_prices.items():
-                            loss = get_price_for_n(price, stats[item]["quantity"], 1)
-                            message += " –{} {} ".format(get_si(loss), currency)
-                        message += "\n"
-                        message += "📉 Leave 1:"
-                        for currency, price in sell_price.items():
-                            gain = get_price_for_n(price, stats[item]["quantity"], -1)
-                            message += " \+{} {} ".format(get_si(gain), currency)
-
-                        # Select
-                        ## Buy
-                        # It's in there that we test for availability
-                        buy = []
-                        can_buy = CAP
-                        for currency, price in base_prices.items():
-                            loss = get_max_to_buy(price, stats[item]["quantity"], stats[currency]["quantity"])
-                            can_buy = min(can_buy, loss)
-                        if can_buy >= 1:
-                            buy.append(
-                                InlineKeyboardButton(
-                                    "📈 Join 1 {}".format(item),
-                                    callback_data="{}b1".format(attrs["id"]),
-                                )
-                            )
-                            if can_buy >= 10:
-                                buy.append(
-                                    InlineKeyboardButton(
-                                        "📈 Join 10 {}".format(item),
-                                        callback_data="{}b10".format(attrs["id"]),
-                                    )
-                                )
-                            buy.append(
-                                InlineKeyboardButton(
-                                    "📈 Join Max {}".format(item),
-                                    callback_data="{}bmax".format(attrs["id"]),
-                                )
-                            )
-
-                        ## Sell
-                        sell = []
-                        if stats[item]["quantity"] >= 1:
-                            sell.append(
-                                InlineKeyboardButton(
-                                    "📉 Leave 1 {}".format(item),
-                                    callback_data="{}s1".format(attrs["id"]),
-                                )
-                            )
-                            if stats[item]["quantity"] >= 10:
-                                sell.append(
-                                    InlineKeyboardButton(
-                                        "📉 Leave 10 {}".format(item),
-                                        callback_data="{}s10".format(attrs["id"]),
-                                    )
-                                )
-                            sell.append(
-                                InlineKeyboardButton(
-                                    "📉 Leave All {}".format(item),
-                                    callback_data="{}smax".format(attrs["id"]),
-                                )
-                            )
-
-                        ## We found the correct
-                        break
-
-            reply_markup = InlineKeyboardMarkup([buy, sell, [InlineKeyboardButton("Back", callback_data="stop")]])
-            try:
-                query.edit_message_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
-            except BadRequest as e:  # Not edit to be done
-                print(str(e))
-                pass
-
-        # Main
-        else:
-            self.logger.info("{} requested the interface".format(update.effective_user.first_name))
-
-            stats = self.players_instance.get_stats(player_id)
-            choices = []
-            for item, attrs in stats.items():  # e.g., "contacts": {"unlock_at", ...}
-                if "unlock_at" in attrs and stats[item]["unlocked"]:
-                    choices.append(
-                        InlineKeyboardButton(item.capitalize(), callback_data="{}x".format(stats[item]["id"]))
-                    )
-
-            if choices:
-                message = "*🧮 Interface 🧮*\n\n"
-                message += get_quantities(player_id, self.players_instance)
-                message += "\n\nSelect what you would like to bargain:"
-                reply_markup = InlineKeyboardMarkup([choices[i : i + 2] for i in range(0, len(choices), 2)])
-            else:
-                message = "*Interface*\n\nYou don't have enough messages for now\.\.\."
-                reply_markup = None
-
-            if update.callback_query:  # "stop"
-                update.callback_query.edit_message_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
-            else:
-                update.message.reply_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
-
 
 STATE_MAIN, STATE_BUY_SELL, STATE_UPGRADES, STATE_TOOLS = range(4)
 
@@ -497,7 +323,9 @@ class PlayerInterfaceHandlers(BaseHandlers):
                         # CallbackQueryHandler(self.tools, pattern="^{}$".format(STATE_TOOLS)),
                     ],
                     STATE_BUY_SELL: [
-                        CallbackQueryHandler(self.buy_sell, pattern="^{}[a-z]?(1|10|max)?$".format(STATE_BUY_SELL)),
+                        CallbackQueryHandler(
+                            self.buy_sell, pattern="^{}[a-z]?[x|b|s]?(1|10|max)?$".format(STATE_BUY_SELL)
+                        ),
                         CallbackQueryHandler(self.interface, pattern="^{}$".format(STATE_MAIN)),
                     ],
                     # STATE_UPGRADES: [],
@@ -579,6 +407,150 @@ class PlayerInterfaceHandlers(BaseHandlers):
 
         # Choice has been made
         else:
-            data = data[1:]
+            player, _ = self.players_instance.get_or_create(player_id)
+            stats = self.players_instance.get_stats(player_id)
+
+            buy = []
+            sell = []
+            message = ""
+
+            # Seeking for the correct one
+            for item, attrs in stats.items():
+                if "id" in attrs:
+                    if data[1] == attrs["id"]:
+                        base_prices = stats[item]["base_price"]
+                        sell_price = {
+                            currency: int(price * RESALE_PERCENTAGE) for currency, price in base_prices.items()
+                        }
+
+                        # Buy
+                        if data[2] == "b":
+                            if data[3:] == "1":
+                                qt = 1
+                            elif data[3:] == "10":
+                                qt = 10
+                            else:
+                                qt = CAP
+                                for currency, price in base_prices.items():
+                                    loss = get_max_to_buy(price, stats[item]["quantity"], stats[currency]["quantity"])
+                                    qt = min(qt, loss)
+                            for currency, price in base_prices.items():
+                                loss = get_price_for_n(price, stats[item]["quantity"], qt)
+                                exec("player.{} -= loss".format(currency))
+                            exec("player.{} += qt".format(item))
+                            exec("player.{}_total += qt".format(item))
+                            player.save()
+                            stats = self.players_instance.get_stats(player_id)
+
+                            if 10 <= stats[item]["quantity"]:
+                                ach = power_10(stats[item]["quantity"])
+                                while ach >= 10:
+                                    self.players_instance.cache[update.effective_user.id]["achievements"].append(
+                                        ACHIEVEMENTS_ID[item]["quantity{}".format(ach)]["id"]
+                                    )
+                                    ach //= 10
+                            if 10 <= stats[item]["total"]:
+                                ach = power_10(stats[item]["total"])
+                                while ach >= 10:
+                                    self.players_instance.cache[update.effective_user.id]["achievements"].append(
+                                        ACHIEVEMENTS_ID[item]["total{}".format(ach)]["id"]
+                                    )
+                                    ach //= 10
+
+                            self.players_instance.update(player_id, context)
+
+                        # Sell
+                        elif data[2] == "s":
+                            if data[3:] == "1":
+                                qt = 1
+                            elif data[3:] == "10":
+                                qt = 10
+                            else:
+                                qt = stats[item]["quantity"]
+                            for currency, price in sell_price.items():
+                                gain = get_price_for_n(price, stats[item]["quantity"], -qt)
+                                exec("player.{} += gain".format(currency))
+                                exec("player.{}_total += gain".format(currency))
+                            exec("player.{} -= qt".format(item))
+                            player.save()
+                            stats = self.players_instance.get_stats(player_id)
+
+                            self.players_instance.update(player_id, context)
+
+                        message = "*🧮 Interface 🧮*\n\n*{}*\n".format(item.capitalize())
+                        message += "You have {} {}\.\n".format(get_si(stats[item]["quantity"]), item)
+                        message += "📈 Join 1:"
+                        for currency, price in base_prices.items():
+                            loss = get_price_for_n(price, stats[item]["quantity"], 1)
+                            message += " –{} {} ".format(get_si(loss), currency)
+                        message += "\n"
+                        message += "📉 Leave 1:"
+                        for currency, price in sell_price.items():
+                            gain = get_price_for_n(price, stats[item]["quantity"], -1)
+                            message += " \+{} {} ".format(get_si(gain), currency)
+
+                        # Select
+                        ## Buy
+                        # It's in there that we test for availability
+                        buy = []
+                        can_buy = CAP
+                        for currency, price in base_prices.items():
+                            loss = get_max_to_buy(price, stats[item]["quantity"], stats[currency]["quantity"])
+                            can_buy = min(can_buy, loss)
+                        if can_buy >= 1:
+                            buy.append(
+                                InlineKeyboardButton(
+                                    "📈 Join 1 {}".format(item),
+                                    callback_data="{}{}b1".format(STATE_BUY_SELL, attrs["id"]),
+                                )
+                            )
+                            if can_buy >= 10:
+                                buy.append(
+                                    InlineKeyboardButton(
+                                        "📈 Join 10 {}".format(item),
+                                        callback_data="{}{}b10".format(STATE_BUY_SELL, attrs["id"]),
+                                    )
+                                )
+                            buy.append(
+                                InlineKeyboardButton(
+                                    "📈 Join Max {}".format(item),
+                                    callback_data="{}{}bmax".format(STATE_BUY_SELL, attrs["id"]),
+                                )
+                            )
+
+                        ## Sell
+                        sell = []
+                        if stats[item]["quantity"] >= 1:
+                            sell.append(
+                                InlineKeyboardButton(
+                                    "📉 Leave 1 {}".format(item),
+                                    callback_data="{}{}s1".format(STATE_BUY_SELL, attrs["id"]),
+                                )
+                            )
+                            if stats[item]["quantity"] >= 10:
+                                sell.append(
+                                    InlineKeyboardButton(
+                                        "📉 Leave 10 {}".format(item),
+                                        callback_data="{}{}s10".format(STATE_BUY_SELL, attrs["id"]),
+                                    )
+                                )
+                            sell.append(
+                                InlineKeyboardButton(
+                                    "📉 Leave All {}".format(item),
+                                    callback_data="{}{}smax".format(STATE_BUY_SELL, attrs["id"]),
+                                )
+                            )
+
+                        ## We found the correct one
+                        break
+
+            reply_markup = InlineKeyboardMarkup(
+                [buy, sell, [InlineKeyboardButton("Back", callback_data="{}".format(STATE_BUY_SELL))]]
+            )
+            try:
+                query.edit_message_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
+            except BadRequest as e:  # Not edit to be done
+                print(str(e))
+                pass
 
         return STATE_BUY_SELL
