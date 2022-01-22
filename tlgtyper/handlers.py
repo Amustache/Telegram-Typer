@@ -154,6 +154,9 @@ class PlayerHandlers(BaseHandlers):
 
             update.message.reply_text("❕ You're ready to play!")
 
+            update.message.reply_text("Simply send a plain message to the bot, and it will answer you – making your score go 📈.")
+            update.message.reply_text("Important: if you send too many messages at once, Telegram will kick you for at most 30 minutes, so, if you see that the bot is not answering anymore, take a break and go touch grass!")
+
             update.message.reply_text(HELP_COMMANDS)
 
             update.message.reply_text(
