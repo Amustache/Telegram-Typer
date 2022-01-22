@@ -4,6 +4,7 @@ Handlers for the bot.
 from collections import Counter
 from datetime import datetime
 import os
+import random
 
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, Update
@@ -18,7 +19,7 @@ from tlgtyper.cooldown import update_cooldown_and_notify
 from tlgtyper.helpers import get_si, power_10
 from tlgtyper.items import accumulate_upgrades, get_max_to_buy, get_price_for_n, id_to_item_name, ITEMS, UPGRADES
 from tlgtyper.jobs import remove_job_if_exists, update_job
-from tlgtyper.texts import get_quantities, HELP_COMMANDS
+from tlgtyper.texts import BLABLA_TEXT, get_quantities, HELP_COMMANDS
 
 
 class BaseHandlers:
@@ -191,6 +192,30 @@ class PlayerHandlers(BaseHandlers):
                 self.players_instance.cache[player_id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["loutres"]["id"])
             self.players_instance.cache[player_id]["from_chat"] += 2
             self.players_instance.cache[player_id]["cooldown"]["counter"] += 1
+
+            # Quickmode
+            if "Get Max" in update.message.text:
+                item = update.message.text.split("Get Max ")[1].lower()
+                stats = self.players_instance.get_stats(player_id)
+                if item not in stats.keys():
+                    return
+
+                player, _ = self.players_instance.get_or_create(player_id)
+                base_prices = stats[item]["base_price"]
+
+                qt = CAP
+                for currency, price in base_prices.items():
+                    loss = get_max_to_buy(price, stats[item]["quantity"], stats[currency]["quantity"])
+                    qt = min(qt, loss)
+
+                for currency, price in base_prices.items():
+                    loss = get_price_for_n(price, stats[item]["quantity"], qt)
+                    exec("player.{} -= loss".format(currency))
+                exec("player.{} += qt".format(item))
+                exec("player.{}_total += qt".format(item))
+                player.save()
+
+                update.message.reply_text("[Quickmode] Got {} {}!".format(qt, item.capitalize()))
         except RetryAfter as e:
             self.logger.error(str(e))
             retry_after = int(str(e).split("in ")[1].split(".0")[0])
@@ -203,7 +228,16 @@ class PlayerHandlers(BaseHandlers):
 
     def quickmode(self, update: Update, context: CallbackContext) -> None:
         user = update.effective_user
-        kb_markup = ReplyKeyboardMarkup([[KeyboardButton("Blablabla")]])
+        player_id = user.id
+        stats = self.players_instance.get_stats(player_id)
+
+        buttons = []
+        for item, attrs in stats.items():  # e.g., "contacts": {"unlock_at", ...}
+            if "unlock_at" in attrs and stats[item]["unlocked"]:
+                buttons.append(KeyboardButton("Get Max {}".format(item.capitalize())))
+
+        buttons = [buttons[i : i + 3] for i in range(0, len(buttons), 3)]
+        kb_markup = ReplyKeyboardMarkup([[KeyboardButton(random.choice(BLABLA_TEXT))], *buttons])
         update.message.reply_text("Simply press the big keyboard button to use quickmode!", reply_markup=kb_markup)
         self.logger.info("{} requested quickmode".format(user.first_name))
 
