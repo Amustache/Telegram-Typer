@@ -326,12 +326,12 @@ class PlayerInterfaceHandlers(BaseHandlers):
                         CallbackQueryHandler(
                             self.buy_sell, pattern="^{}[a-z]?[x|b|s]?(1|10|max)?$".format(STATE_BUY_SELL)
                         ),
-                        CallbackQueryHandler(self.interface, pattern="^{}$".format(STATE_MAIN)),
+                        CallbackQueryHandler(self.interface_again, pattern="^{}$".format(STATE_MAIN)),
                     ],
                     # STATE_UPGRADES: [],
                     # STATE_TOOLS: [],
                 },
-                fallbacks=[CommandHandler(["advinterface"], self.interface)],
+                fallbacks=[CommandHandler(["interface"], self.interface)],
             ),
         ]
         super().__init__(
@@ -347,30 +347,71 @@ class PlayerInterfaceHandlers(BaseHandlers):
         if update_cooldown_and_notify(player_id, self.players_instance, context):
             return
 
-        reply_markup = InlineKeyboardMarkup(
+        choices = [
             [
-                [
-                    InlineKeyboardButton("Buy/Sell", callback_data=str(STATE_BUY_SELL)),
-                ],
+                InlineKeyboardButton("Get/Forfeit", callback_data=str(STATE_BUY_SELL)),
+            ]
+        ]
+        if player.upgrades:
+            choices.append(
                 [
                     InlineKeyboardButton("Upgrades", callback_data=str(STATE_UPGRADES)),
-                ],
+                ]
+            )
+        if player.tools:
+            choices.append(
                 [
                     InlineKeyboardButton("Tools", callback_data=str(STATE_TOOLS)),
-                ],
-            ]
+                ]
+            )
+        reply_markup = InlineKeyboardMarkup(choices)
+
+        message = (
+            "*⌨️Main menu ⌨️*\n\n"
+            "Here you can get or forfeit items, upgrade them, and more\.\.\.\n\n"
+            "\.\.\. Given you have what it takes\."
         )
 
-        message = "Main menu"
+        update.message.reply_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
 
-        if update.callback_query:
-            query = update.callback_query
-            query.answer()
-            update.callback_query.edit_message_text(message, reply_markup=reply_markup)
-        else:
-            update.message.reply_text(message, reply_markup=reply_markup)
+        self.logger.info("{} requested the main menu".format(update.effective_user.first_name))
 
-        self.logger.info("{} requested the interface".format(update.effective_user.first_name))
+        return STATE_MAIN
+
+    def interface_again(self, update: Update, context: CallbackContext):
+        player_id = update.effective_user.id
+        player, _ = self.players_instance.get_or_create(player_id)
+        if update_cooldown_and_notify(player_id, self.players_instance, context):
+            return
+
+        choices = [
+            [
+                InlineKeyboardButton("Get/Forfeit", callback_data=str(STATE_BUY_SELL)),
+            ]
+        ]
+        if player.upgrades:
+            choices.append(
+                [
+                    InlineKeyboardButton("Upgrades", callback_data=str(STATE_UPGRADES)),
+                ]
+            )
+        if player.tools:
+            choices.append(
+                [
+                    InlineKeyboardButton("Tools", callback_data=str(STATE_TOOLS)),
+                ]
+            )
+        reply_markup = InlineKeyboardMarkup(choices)
+
+        message = (
+            "*⌨️Main menu ⌨️*\n\n"
+            "Here you can get or forfeit items, upgrade them, and more\.\.\.\n\n"
+            "\.\.\. Given you have what it takes\."
+        )
+
+        query = update.callback_query
+        query.answer()
+        update.callback_query.edit_message_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
 
         return STATE_MAIN
 
@@ -393,13 +434,13 @@ class PlayerInterfaceHandlers(BaseHandlers):
                         )
                     )
 
+            message = "*📈 Get/Forfeit 📈*\n\n"
             if choices:
-                message = "*🧮 Interface 🧮*\n\n"
                 message += get_quantities(player_id, self.players_instance)
                 message += "\n\nSelect what you would like to bargain:"
                 choices = [choices[i : i + 2] for i in range(0, len(choices), 2)]
             else:
-                message = "*Interface*\n\nYou don't have enough messages for now\.\.\."
+                message = "You don't have enough messages for now\.\.\."
 
             choices.append([InlineKeyboardButton("Back", callback_data=str(STATE_MAIN))])
             reply_markup = InlineKeyboardMarkup(choices)
@@ -413,7 +454,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
 
             buy = []
             sell = []
-            message = ""
+            message = "*📈 Get/Forfeit 📈*\n\n"
 
             # Seeking for the correct one
             for item, attrs in stats.items():
@@ -478,7 +519,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
 
                             self.players_instance.update(player_id, context)
 
-                        message = "*🧮 Interface 🧮*\n\n*{}*\n".format(item.capitalize())
+                        message += "*{}*\n".format(item.capitalize())
                         message += "You have {} {}\.\n\n".format(get_si(stats[item]["quantity"]), item)
                         message += "💸 Cost to Get:\n"
                         for currency, price in base_prices.items():

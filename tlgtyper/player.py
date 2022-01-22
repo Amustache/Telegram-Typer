@@ -25,30 +25,32 @@ class Players:
 
         # Stats
         messages = FloatField(default=0)
-        messages_state = IntegerField(default=1)  # Unlocked by default
+        messages_state = IntegerField(default=1)  # bool; Unlocked by default
         messages_total = FloatField(default=0)
         messages_upgrades = CharField(default="")  # "xx,yy"
 
         contacts = FloatField(default=0)
-        contacts_state = IntegerField(default=0)
+        contacts_state = IntegerField(default=0)  # bool
         contacts_total = FloatField(default=0)
         contacts_upgrades = CharField(default="")  # "xx,yy"
 
         groups = FloatField(default=0)
-        groups_state = IntegerField(default=0)
+        groups_state = IntegerField(default=0)  # bool
         groups_total = FloatField(default=0)
         groups_upgrades = CharField(default="")  # "xx,yy"
 
         channels = FloatField(default=0)
-        channels_state = IntegerField(default=0)
+        channels_state = IntegerField(default=0)  # bool
         channels_total = FloatField(default=0)
         channels_upgrades = CharField(default="")  # "xx,yy"
 
         supergroups = FloatField(default=0)
-        supergroups_state = IntegerField(default=0)
+        supergroups_state = IntegerField(default=0)  # bool
         supergroups_total = FloatField(default=0)
         supergroups_upgrades = CharField(default="")  # "xx,yy"
 
+        upgrades = IntegerField(default=0)  # bool
+        tools = IntegerField(default=0)  # bool
         achievements = CharField(default="")  # "xx,yy"
 
     cache = defaultdict(
@@ -100,8 +102,14 @@ class Players:
                         break
                 if unlock:
                     exec("player.{}_state = 1".format(item))
-                    player.save()
                     Players.cache[player_id]["achievements"].append(ACHIEVEMENTS_ID[item]["unlocked"]["id"])
+
+                    # Upgrades
+                    if item == "supergroups":
+                        player.upgrades = 1
+                        Players.cache[player_id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["upgrades"]["id"])
+
+                    player.save()
 
     def update_pinned_message(
         self, player_id: int, context: CallbackContext
