@@ -14,6 +14,9 @@ from tlgtyper.texts import get_quantities
 
 
 class Players:
+    def __init__(self, logger):
+        self.logger = logger
+
     class Model(Model):
         # Self
         id = BigIntegerField(unique=True)
@@ -112,17 +115,19 @@ class Players:
         try:
             context.bot.edit_message_text(message, player_id, user.pinned_message)
         except RetryAfter as e:
-            # self.logger.error(str(e))
+            self.logger.error(str(e))
             retry_after = int(str(e).split("in ")[1].split(".0")[0])
             self.cache[player_id]["cooldown"]["retry_after"] = retry_after
-        except BadRequest as e:  # Edit problem
-            context.bot.send_message(
-                player_id,
-                "Oops\! It seems like I did not find the pinned message\. Could you use /reset, please\?",
-                parse_mode="MarkdownV2",
-            )
-            # self.logger.error(str(e))
-            remove_job_if_exists(str(player_id), context)
+        # Edit problem
+        except BadRequest as e:
+            if "Message to edit not found" in str(e):
+                context.bot.send_message(
+                    player_id,
+                    "Oops\! It seems like I did not find the pinned message\. Could you use /reset, please\?",
+                    parse_mode="MarkdownV2",
+                )
+                remove_job_if_exists(str(player_id), context)
+            self.logger.error(str(e))
 
     def update_achievements(
         self, player_id: int, context: CallbackContext

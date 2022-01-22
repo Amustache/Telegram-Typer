@@ -14,13 +14,11 @@ from tlgtyper.jobs import start_all_jobs
 from tlgtyper.player import Players
 
 
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
-)
+logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 
 logger = logging.getLogger(__name__)
 
-Players = Players()
+Players = Players(logger)
 
 DB = SqliteDatabase(DB_PATH)
 DB.bind([Players.Model])
@@ -39,10 +37,12 @@ def main() -> None:
     commands = ""
     for handler in dispatcher.handlers[0]:
         try:
-            commands += "{}\n".format("\n".join("{} - {}".format(command, handler.callback.__name__) for command in handler.command))
+            commands += "{}\n".format(
+                "\n".join("{} - {}".format(command, handler.callback.__name__) for command in handler.command)
+            )
         except AttributeError:
             continue
-    print("{}\nList of commands\n{}\n{}".format("*"*13, commands, "*"*13))
+    print("{}\nList of commands\n{}\n{}".format("*" * 13, commands, "*" * 13))
 
     # Jobs
     start_all_jobs(dispatcher, Players)
