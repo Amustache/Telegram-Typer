@@ -86,8 +86,13 @@ class Players:
         return result
 
     def get_achievements(self, player_id: int):
-        user, _ = self.get_or_create(player_id)
-        return [int(num) for num in user.achievements.split(",") if num]
+        player, _ = self.get_or_create(player_id)
+        return [int(num) for num in player.achievements.split(",") if num]
+
+    def get_upgrades(self, player_id: int, item: str):
+        player, _ = self.get_or_create(player_id)
+        upgrades = eval("player.{}_upgrades".format(item))
+        return [int(num) for num in upgrades.split(",") if num]
 
     def update_unlocks(self, player_id: int) -> None:
         player, _ = self.get_or_create(player_id)
@@ -110,9 +115,9 @@ class Players:
             Players.cache[player_id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["upgrades"]["id"])
 
         # Tools
-        if stats["messages"]["total"] >= 1_337:
-            player.tools = 1
-            Players.cache[player_id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["tools"]["id"])
+        # if stats["messages"]["total"] >= 1_337:
+        #     player.tools = 1
+        #     Players.cache[player_id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["tools"]["id"])
 
         player.save()
 

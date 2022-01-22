@@ -66,8 +66,23 @@ def get_max_to_buy(base_price: int, cur_items: int, max_price: int) -> int:
         return CAP
 
 
+def id_to_item_name(item_id: str):
+    for item, attrs in ITEMS.items():
+        if attrs["id"] == item_id:
+            return item
+    return None
+
+
 UPGRADES = {
-    "messages": {None},
+    "messages": {
+        0xFF: {
+            "title": "Test",
+            "text": "Magic messages\!",
+            "conditions": {"messages": 1},
+            "cost": {"messages": 1000},
+            "effect": lambda x: x + 1,
+        },
+    },
     "contacts": {
         0x01: {
             "title": "Test",

@@ -16,7 +16,7 @@ from secret import ADMIN_CHAT, BOT_LINK
 from tlgtyper.achievements import ACHIEVEMENTS, ACHIEVEMENTS_ID, MAX_ACHIEVEMENTS
 from tlgtyper.cooldown import update_cooldown_and_notify
 from tlgtyper.helpers import get_si, power_10
-from tlgtyper.items import get_max_to_buy, get_price_for_n, ITEMS
+from tlgtyper.items import accumulate_upgrades, get_max_to_buy, get_price_for_n, id_to_item_name, ITEMS, UPGRADES
 from tlgtyper.jobs import remove_job_if_exists, update_job
 from tlgtyper.texts import get_quantities, HELP_COMMANDS
 
@@ -258,7 +258,12 @@ class PlayerHandlers(BaseHandlers):
                 message += "– {} {} in total\.\n".format(get_si(attrs["total"]), item)
                 for currency, quantity in attrs["gain"].items():
                     message += "– Add {} {} per second\.\n".format(
-                        get_si(attrs["quantity"] * quantity, type="f"), currency
+                        get_si(
+                            accumulate_upgrades(item, stats[item]["upgrades"], stats[item]["gain"]["messages"])
+                            * stats[item]["quantity"],
+                            type="f",
+                        ),
+                        currency,
                     )
                 message += "\n"
 
@@ -319,7 +324,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
                 states={
                     STATE_MAIN: [
                         CallbackQueryHandler(self.buy_sell, pattern="^{}$".format(STATE_BUY_SELL)),
-                        # CallbackQueryHandler(self.upgrades, pattern="^{}$".format(STATE_UPGRADES)),
+                        CallbackQueryHandler(self.upgrades, pattern="^{}$".format(STATE_UPGRADES)),
                         # CallbackQueryHandler(self.tools, pattern="^{}$".format(STATE_TOOLS)),
                     ],
                     STATE_BUY_SELL: [
@@ -328,7 +333,10 @@ class PlayerInterfaceHandlers(BaseHandlers):
                         ),
                         CallbackQueryHandler(self.interface_again, pattern="^{}$".format(STATE_MAIN)),
                     ],
-                    # STATE_UPGRADES: [],
+                    STATE_UPGRADES: [
+                        CallbackQueryHandler(self.upgrades, pattern="^{}[a-z]?[0-9]*$".format(STATE_UPGRADES)),
+                        CallbackQueryHandler(self.interface_again, pattern="^{}$".format(STATE_MAIN)),
+                    ],
                     # STATE_TOOLS: [],
                 },
                 fallbacks=[CommandHandler(["interface"], self.interface)],
@@ -519,7 +527,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
 
                             self.players_instance.update(player_id, context)
 
-                        message += "*{}*\n".format(item.capitalize())
+                        message += "*{} {}*\n".format(stats[item]["symbol"], item.capitalize())
                         message += "You have {} {}\.\n\n".format(get_si(stats[item]["quantity"]), item)
                         message += "💸 Cost to Get:\n"
                         for currency, price in base_prices.items():
@@ -619,5 +627,105 @@ class PlayerInterfaceHandlers(BaseHandlers):
         query = update.callback_query
         query.answer()
         data = query.data
+
+        # Main
+        if data == str(STATE_UPGRADES):
+            stats = self.players_instance.get_stats(player_id)
+            choices = []
+            for item, upgrades in UPGRADES.items():
+                if stats[item]["unlocked"]:
+                    choices.append(
+                        InlineKeyboardButton(
+                            "{} {}".format(stats[item]["symbol"], item.capitalize()),
+                            callback_data="{}{}".format(STATE_UPGRADES, stats[item]["id"]),
+                        )
+                    )
+
+            message = "*🆙 Upgrades 🆙*\n\n"
+            if choices:
+                message += (
+                    "Upgrades are way to enhance the production of messages\.\n\n"
+                    "Select what you would like to upgrade:"
+                )
+                choices = [choices[i : i + 2] for i in range(0, len(choices), 2)]
+            else:
+                message = "You cannot upgrade anything for now\.\.\."
+
+            choices.append([InlineKeyboardButton("Back", callback_data=str(STATE_MAIN))])
+            reply_markup = InlineKeyboardMarkup(choices)
+
+            update.callback_query.edit_message_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
+
+        # Choice has been made
+        else:
+            player, _ = self.players_instance.get_or_create(player_id)
+            stats = self.players_instance.get_stats(player_id)
+            item = id_to_item_name(data[1])
+            current_upgrades = set(self.players_instance.get_upgrades(player_id, item))
+
+            print("DATA", data)
+
+            if data[2:]:
+                upgrade_id = int(data[2:])
+                for currency, quantity in UPGRADES[item][upgrade_id]["cost"].items():
+                    exec("player.{} -= quantity".format(currency))
+                current_upgrades.add(upgrade_id)
+                exec('player.{}_upgrades = ", ".join([str(num) for num in current_upgrades if num])'.format(item))
+                player.save()
+
+            message = "*🆙 Upgrades 🆙*\n\n"
+            message += "*{} {}*\n\n".format(stats[item]["symbol"], item.capitalize())
+            message += "Available upgrades:\n"
+            available_upgrades = []
+
+            for upgrade_id, attrs in UPGRADES[item].items():
+                if upgrade_id not in current_upgrades:
+                    available = True
+                    for currency, quantity in attrs["conditions"].items():
+                        if stats[currency]["total"] < quantity:
+                            available = False
+                            break
+                    if available:
+                        message += (
+                            "*\[{}\] {}*\n"
+                            "_{}_\n"
+                            "Costs: {}\n".format(
+                                upgrade_id,
+                                attrs["title"],
+                                attrs["text"],
+                                ", ".join(
+                                    [
+                                        "{} {}".format(get_si(quantity), currency)
+                                        for currency, quantity in attrs["cost"].items()
+                                    ]
+                                ),
+                            )
+                        )
+                        can_buy = True
+                        for currency, quantity in UPGRADES[item][upgrade_id]["cost"].items():
+                            if stats[currency]["quantity"] < quantity:
+                                can_buy = False
+                                break
+                        if can_buy:
+                            available_upgrades.append(upgrade_id)
+
+            if not available_upgrades:
+                message += "None for the moment\."
+
+            buttons = [
+                InlineKeyboardButton(
+                    upgrade_id, callback_data="{}{}{}".format(STATE_UPGRADES, stats[item]["id"], upgrade_id)
+                )
+                for upgrade_id in available_upgrades
+            ]
+            buttons = [buttons[i : i + 4] for i in range(0, len(buttons), 4)]
+            buttons.append([InlineKeyboardButton("Back", callback_data="{}".format(STATE_UPGRADES))])
+
+            reply_markup = InlineKeyboardMarkup(buttons)
+            try:
+                query.edit_message_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
+            except BadRequest as e:  # Not edit to be done
+                print(str(e))
+                pass
 
         return STATE_UPGRADES
