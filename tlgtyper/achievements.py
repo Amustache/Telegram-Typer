@@ -20,6 +20,12 @@ ACHIEVEMENTS_ID = {
             "title": "And now for a faster pace\.\.\.",
             "text": "You can now upgrades your items\!",
         },
+        "tools": {
+            "id": 0xFD,
+            "medal": MEDALS[2],
+            "title": "Everything is a nail",
+            "text": "You can now use tools\!",
+        },
         "loutres": {
             "id": 0xFF,
             "medal": MEDALS[2],

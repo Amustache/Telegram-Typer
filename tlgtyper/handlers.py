@@ -553,12 +553,20 @@ class PlayerInterfaceHandlers(BaseHandlers):
                                         callback_data="{}{}b10".format(STATE_BUY_SELL, attrs["id"]),
                                     )
                                 )
+                            else:
+                                buy.append(
+                                    InlineKeyboardButton(" ", callback_data="{}{}x".format(STATE_BUY_SELL, attrs["id"]))
+                                )
                             buy.append(
                                 InlineKeyboardButton(
                                     "Get max {}".format(item),
                                     callback_data="{}{}bmax".format(STATE_BUY_SELL, attrs["id"]),
                                 )
                             )
+                        else:
+                            buy = [
+                                InlineKeyboardButton("", callback_data="{}{}x".format(STATE_BUY_SELL, attrs["id"]))
+                            ] * 3
 
                         ## Sell
                         sell = []
@@ -576,19 +584,28 @@ class PlayerInterfaceHandlers(BaseHandlers):
                                         callback_data="{}{}s10".format(STATE_BUY_SELL, attrs["id"]),
                                     )
                                 )
+                            else:
+                                sell.append(
+                                    InlineKeyboardButton("", callback_data="{}{}x".format(STATE_BUY_SELL, attrs["id"]))
+                                )
                             sell.append(
                                 InlineKeyboardButton(
                                     "Forfeit all {}".format(item),
                                     callback_data="{}{}smax".format(STATE_BUY_SELL, attrs["id"]),
                                 )
                             )
+                        else:
+                            sell = [
+                                InlineKeyboardButton("", callback_data="{}{}x".format(STATE_BUY_SELL, attrs["id"]))
+                            ] * 3
 
                         ## We found the correct one
                         break
 
-            reply_markup = InlineKeyboardMarkup(
-                [buy, sell, [InlineKeyboardButton("Back", callback_data="{}".format(STATE_BUY_SELL))]]
-            )
+            buttons = list(map(list, zip(*[buy, sell])))
+            buttons.append([InlineKeyboardButton("Back", callback_data="{}".format(STATE_BUY_SELL))])
+
+            reply_markup = InlineKeyboardMarkup(buttons)
             try:
                 query.edit_message_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
             except BadRequest as e:  # Not edit to be done
@@ -596,3 +613,11 @@ class PlayerInterfaceHandlers(BaseHandlers):
                 pass
 
         return STATE_BUY_SELL
+
+    def upgrades(self, update: Update, context: CallbackContext):
+        player_id = update.effective_user.id
+        query = update.callback_query
+        query.answer()
+        data = query.data
+
+        return STATE_UPGRADES

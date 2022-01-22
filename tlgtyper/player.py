@@ -104,12 +104,17 @@ class Players:
                     exec("player.{}_state = 1".format(item))
                     Players.cache[player_id]["achievements"].append(ACHIEVEMENTS_ID[item]["unlocked"]["id"])
 
-                    # Upgrades
-                    if item == "supergroups":
-                        player.upgrades = 1
-                        Players.cache[player_id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["upgrades"]["id"])
+        # Upgrades
+        if stats["messages"]["total"] >= 420:
+            player.upgrades = 1
+            Players.cache[player_id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["upgrades"]["id"])
 
-                    player.save()
+        # Tools
+        if stats["messages"]["total"] >= 1_337:
+            player.tools = 1
+            Players.cache[player_id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["tools"]["id"])
+
+        player.save()
 
     def update_pinned_message(
         self, player_id: int, context: CallbackContext
