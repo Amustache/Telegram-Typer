@@ -1,7 +1,7 @@
 from math import ceil, floor, log
 
 
-from parameters import FACTOR
+from parameters import CAP, FACTOR
 
 
 ITEMS = {
@@ -60,14 +60,23 @@ def accumulate_upgrades(item: str, upgrades_ids: str, base_value: int) -> float:
 
 
 def get_price(base_price: int, cur_items: int) -> int:
-    return ceil(base_price * FACTOR ** cur_items)
+    try:
+        return int(base_price * FACTOR ** cur_items)
+    except OverflowError:
+        return CAP
 
 
 def get_price_for_n(base_price: int, cur_items: int, wanted_items: int) -> int:
-    # See https://en.wikipedia.org/wiki/Geometric_progression#Geometric_series
-    return ceil(base_price * ((FACTOR ** cur_items) - (FACTOR ** (cur_items + wanted_items))) / (1 - FACTOR))
+    try:
+        # See https://en.wikipedia.org/wiki/Geometric_progression#Geometric_series
+        return int(abs(base_price * ((FACTOR ** cur_items) - (FACTOR ** (cur_items + wanted_items))) / (1 - FACTOR)))
+    except OverflowError:
+        return CAP
 
 
 def get_max_to_buy(base_price: int, cur_items: int, max_price: int) -> int:
-    value = 1 - (max_price / base_price) * (1 - FACTOR) / (FACTOR ** cur_items)
-    return floor(log(value, FACTOR))
+    try:
+        value = 1 - (max_price / base_price) * (1 - FACTOR) / (FACTOR ** cur_items)
+        return floor(log(value, FACTOR))
+    except OverflowError:
+        return CAP

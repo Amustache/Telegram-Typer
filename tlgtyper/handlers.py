@@ -15,7 +15,7 @@ from parameters import CAP, RESALE_PERCENTAGE
 from secret import ADMIN_CHAT, BOT_LINK
 from tlgtyper.achievements import ACHIEVEMENTS, ACHIEVEMENTS_ID, MAX_ACHIEVEMENTS
 from tlgtyper.cooldown import update_cooldown_and_notify
-from tlgtyper.helpers import get_si, power_10, send_typing_action
+from tlgtyper.helpers import get_si, power_10
 from tlgtyper.items import get_max_to_buy, get_price_for_n
 from tlgtyper.jobs import remove_job_if_exists, update_job
 from tlgtyper.texts import get_quantities, HELP_COMMANDS
@@ -86,7 +86,6 @@ class PlayerHandlers(BaseHandlers):
             CommandHandler(["achievements", "achievement"], self.show_achievements),
             CommandHandler(["stats", "stat"], self.show_stats),
             CommandHandler(["interface", "buy", "sell", "join", "leave"], self.interface),
-            CommandHandler(["test"], self.interface_upgrades),
             CallbackQueryHandler(self.interface),
         ]
         super().__init__(
@@ -272,12 +271,6 @@ class PlayerHandlers(BaseHandlers):
             update.message.reply_text(message, parse_mode="MarkdownV2")
         self.logger.info("{} requested achievements".format(update.effective_user.first_name))
 
-    def interface_upgrades(self, update: Update, context: CallbackContext):
-        player_id = update.effective_user.id
-        player, _ = self.players_instance.get_or_create(player_id)
-        player.contacts_upgrades = "1"
-        player.save()
-
     def interface(self, update: Update, context: CallbackContext):
         player_id = update.effective_user.id
         player, _ = self.players_instance.get_or_create(player_id)
@@ -306,7 +299,10 @@ class PlayerHandlers(BaseHandlers):
                             elif data[2:] == "10":
                                 qt = 10
                             else:
-                                qt = int(data[2:])
+                                qt = CAP
+                                for currency, price in base_prices.items():
+                                    loss = get_max_to_buy(price, stats[item]["quantity"], stats[currency]["quantity"])
+                                    qt = min(qt, loss)
                             for currency, price in base_prices.items():
                                 loss = get_price_for_n(price, stats[item]["quantity"], qt)
                                 exec("player.{} -= loss".format(currency))
@@ -340,7 +336,7 @@ class PlayerHandlers(BaseHandlers):
                             else:
                                 qt = stats[item]["quantity"]
                             for currency, price in sell_price.items():
-                                gain = -get_price_for_n(price, stats[item]["quantity"], -qt)
+                                gain = get_price_for_n(price, stats[item]["quantity"], -qt)
                                 exec("player.{} += gain".format(currency))
                                 exec("player.{}_total += gain".format(currency))
                             exec("player.{} -= qt".format(item))
@@ -351,15 +347,15 @@ class PlayerHandlers(BaseHandlers):
 
                         message = "*🧮 Interface 🧮*\n\n*{}*\n".format(item.capitalize())
                         message += "You have {} {}\.\n".format(get_si(stats[item]["quantity"]), item)
-                        message += "📈 Join:"
+                        message += "📈 Join 1:"
                         for currency, price in base_prices.items():
                             loss = get_price_for_n(price, stats[item]["quantity"], 1)
-                            message += " –{} {} ".format(loss, currency)
+                            message += " –{} {} ".format(get_si(loss), currency)
                         message += "\n"
-                        message += "📉 Leave:"
+                        message += "📉 Leave 1:"
                         for currency, price in sell_price.items():
-                            gain = -get_price_for_n(price, stats[item]["quantity"], -1)
-                            message += " \+{} {} ".format(gain, currency)
+                            gain = get_price_for_n(price, stats[item]["quantity"], -1)
+                            message += " \+{} {} ".format(get_si(gain), currency)
 
                         # Select
                         ## Buy
@@ -386,7 +382,7 @@ class PlayerHandlers(BaseHandlers):
                             buy.append(
                                 InlineKeyboardButton(
                                     "📈 Join Max {}".format(item),
-                                    callback_data="{}b{}".format(attrs["id"], can_buy),
+                                    callback_data="{}bmax".format(attrs["id"]),
                                 )
                             )
 
@@ -417,13 +413,14 @@ class PlayerHandlers(BaseHandlers):
                         break
 
             reply_markup = InlineKeyboardMarkup([buy, sell, [InlineKeyboardButton("Back", callback_data="stop")]])
-
             try:
                 query.edit_message_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
-            except BadRequest:  # Not edit to be done
+            except BadRequest as e:  # Not edit to be done
+                print(str(e))
                 pass
 
-        else:  # Main
+        # Main
+        else:
             self.logger.info("{} requested the interface".format(update.effective_user.first_name))
 
             stats = self.players_instance.get_stats(player_id)
@@ -438,7 +435,7 @@ class PlayerHandlers(BaseHandlers):
                 message = "*🧮 Interface 🧮*\n\n"
                 message += get_quantities(player_id, self.players_instance)
                 message += "\n\nSelect what you would like to bargain:"
-                reply_markup = InlineKeyboardMarkup([choices])
+                reply_markup = InlineKeyboardMarkup([choices[i : i + 2] for i in range(0, len(choices), 2)])
             else:
                 message = "*Interface*\n\nYou don't have enough messages for now\.\.\."
                 reply_markup = None
