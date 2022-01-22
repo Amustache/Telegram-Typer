@@ -388,7 +388,8 @@ class PlayerInterfaceHandlers(BaseHandlers):
                 if "unlock_at" in attrs and stats[item]["unlocked"]:
                     choices.append(
                         InlineKeyboardButton(
-                            item.capitalize(), callback_data="{}{}x".format(STATE_BUY_SELL, stats[item]["id"])
+                            "{} {}".format(stats[item]["symbol"], item.capitalize()),
+                            callback_data="{}{}x".format(STATE_BUY_SELL, stats[item]["id"]),
                         )
                     )
 
@@ -478,16 +479,16 @@ class PlayerInterfaceHandlers(BaseHandlers):
                             self.players_instance.update(player_id, context)
 
                         message = "*🧮 Interface 🧮*\n\n*{}*\n".format(item.capitalize())
-                        message += "You have {} {}\.\n".format(get_si(stats[item]["quantity"]), item)
-                        message += "📈 Join 1:"
+                        message += "You have {} {}\.\n\n".format(get_si(stats[item]["quantity"]), item)
+                        message += "💸 Cost to Get:\n"
                         for currency, price in base_prices.items():
                             loss = get_price_for_n(price, stats[item]["quantity"], 1)
-                            message += " –{} {} ".format(get_si(loss), currency)
+                            message += "– {} {}\n".format(get_si(loss), currency)
                         message += "\n"
-                        message += "📉 Leave 1:"
+                        message += "💰 Gain for Forfeit:\n"
                         for currency, price in sell_price.items():
                             gain = get_price_for_n(price, stats[item]["quantity"], -1)
-                            message += " \+{} {} ".format(get_si(gain), currency)
+                            message += "– {} {}\n".format(get_si(gain), currency)
 
                         # Select
                         ## Buy
@@ -500,20 +501,20 @@ class PlayerInterfaceHandlers(BaseHandlers):
                         if can_buy >= 1:
                             buy.append(
                                 InlineKeyboardButton(
-                                    "📈 Join 1 {}".format(item),
+                                    "Get 1 {}".format(item[:-1]),
                                     callback_data="{}{}b1".format(STATE_BUY_SELL, attrs["id"]),
                                 )
                             )
                             if can_buy >= 10:
                                 buy.append(
                                     InlineKeyboardButton(
-                                        "📈 Join 10 {}".format(item),
+                                        "Get 10 {}".format(item),
                                         callback_data="{}{}b10".format(STATE_BUY_SELL, attrs["id"]),
                                     )
                                 )
                             buy.append(
                                 InlineKeyboardButton(
-                                    "📈 Join Max {}".format(item),
+                                    "Get max {}".format(item),
                                     callback_data="{}{}bmax".format(STATE_BUY_SELL, attrs["id"]),
                                 )
                             )
@@ -523,20 +524,20 @@ class PlayerInterfaceHandlers(BaseHandlers):
                         if stats[item]["quantity"] >= 1:
                             sell.append(
                                 InlineKeyboardButton(
-                                    "📉 Leave 1 {}".format(item),
+                                    "Forfeit 1 {}".format(item[:-1]),
                                     callback_data="{}{}s1".format(STATE_BUY_SELL, attrs["id"]),
                                 )
                             )
                             if stats[item]["quantity"] >= 10:
                                 sell.append(
                                     InlineKeyboardButton(
-                                        "📉 Leave 10 {}".format(item),
+                                        "Forfeit 10 {}".format(item),
                                         callback_data="{}{}s10".format(STATE_BUY_SELL, attrs["id"]),
                                     )
                                 )
                             sell.append(
                                 InlineKeyboardButton(
-                                    "📉 Leave All {}".format(item),
+                                    "Forfeit all {}".format(item),
                                     callback_data="{}{}smax".format(STATE_BUY_SELL, attrs["id"]),
                                 )
                             )
