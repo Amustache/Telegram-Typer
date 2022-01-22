@@ -8,15 +8,15 @@ import os
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, Update
 from telegram.error import BadRequest, RetryAfter
-from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler, Filters, MessageHandler
+from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler, ConversationHandler, Filters, MessageHandler
 
 
 from parameters import CAP, RESALE_PERCENTAGE
 from secret import ADMIN_CHAT, BOT_LINK
 from tlgtyper.achievements import ACHIEVEMENTS, ACHIEVEMENTS_ID, MAX_ACHIEVEMENTS
 from tlgtyper.cooldown import update_cooldown_and_notify
-from tlgtyper.helpers import get_si, power_10, send_typing_action
-from tlgtyper.items import get_max_to_buy, get_price_for_n
+from tlgtyper.helpers import get_si, power_10
+from tlgtyper.items import accumulate_upgrades, get_max_to_buy, get_price_for_n, id_to_item_name, ITEMS, UPGRADES
 from tlgtyper.jobs import remove_job_if_exists, update_job
 from tlgtyper.texts import get_quantities, HELP_COMMANDS
 
@@ -56,9 +56,7 @@ class BaseHandlers:
         commands = ""
         for handler in self.command_handlers:
             try:
-                commands += "- {} => {};\n".format(
-                    ", ".join(handler.command), handler.callback.__name__
-                )
+                commands += "- {} => {};\n".format(", ".join(handler.command), handler.callback.__name__)
             except:
                 continue
         return commands
@@ -70,13 +68,46 @@ class BaseHandlers:
         commands = ""
         for handler in self.command_handlers:
             try:
-                commands += [
-                    "{} - {}\n".format(command, handler.callback.__name__)
-                    for command in handler.command
-                ]
+                commands += ["{} - {}\n".format(command, handler.callback.__name__) for command in handler.command]
             except:
                 continue
         return commands
+
+
+class AdminHandlers(BaseHandlers):
+    def __init__(self, players_instance, logger=None, media_folder=None):
+        command_handlers = [
+            CommandHandler(["debug", "cheat", "rich"], self.be_rich),
+            CommandHandler(["notify"], self.notify_all),
+        ]
+        super().__init__(
+            command_handlers=command_handlers,
+            players_instance=players_instance,
+            logger=logger,
+            media_folder=media_folder,
+        )
+
+    def be_rich(self, update: Update, context: CallbackContext) -> None:
+        player_id = update.effective_user.id
+        if player_id == ADMIN_CHAT:
+            player, _ = self.players_instance.get_or_create(player_id)
+            player.messages += 10_000_000_000
+            player.messages_total += 10_000_000_000
+            player.save()
+        update.message.reply_text("Sent 10'000'000'000 messages.")
+        self.logger.info("{} cheated.".format(update.effective_user.first_name))
+
+    def notify_all(self, update: Update, context: CallbackContext) -> None:
+        if update.effective_user.id == ADMIN_CHAT:
+            if update.message.reply_to_message:
+                for player in self.players_instance.Model.select():
+                    context.bot.send_message(player.id, update.message.reply_to_message.text)
+                self.logger.info("{} sent a global message.".format(update.effective_user.first_name))
+            else:
+                text_to_send = "🗣 Message from admin 🗣\n{}".format(update.effective_message.text.split(" ", 1)[1])
+                update.message.reply_text("This is a preview:").reply_text(text_to_send).reply_text(
+                    "Reply /notify to the previous message to send it."
+                )
 
 
 class PlayerHandlers(BaseHandlers):
@@ -90,8 +121,8 @@ class PlayerHandlers(BaseHandlers):
             CommandHandler(["stop", "stop_game", "end", "end_game"], self.stop_bot),
             CommandHandler(["achievements", "achievement"], self.show_achievements),
             CommandHandler(["stats", "stat"], self.show_stats),
-            CommandHandler(["interface", "buy", "sell", "join", "leave"], self.interface),
-            CallbackQueryHandler(self.interface),
+            # CommandHandler(["interface", "buy", "sell", "join", "leave"], self.interface),
+            # CallbackQueryHandler(self.interface),
         ]
         super().__init__(
             command_handlers=command_handlers,
@@ -104,9 +135,9 @@ class PlayerHandlers(BaseHandlers):
         user = update.effective_user
 
         with open(self._media("typing.gif"), "rb") as gif:
-            update.message.reply_document(
-                gif, caption="👋 Welcome, {}!".format(user.first_name)
-            ).reply_text("Press /new_game to play!")
+            update.message.reply_document(gif, caption="👋 Welcome, {}!".format(user.first_name)).reply_text(
+                "Press /new_game to play!"
+            )
 
         self.logger.info("{} started the bot".format(user.first_name))
 
@@ -118,9 +149,7 @@ class PlayerHandlers(BaseHandlers):
         if created:
             player.first_name = user.first_name
 
-            self.players_instance.cache[player_id]["achievements"].append(
-                ACHIEVEMENTS_ID["misc"]["start"]["id"]
-            )
+            self.players_instance.cache[player_id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["start"]["id"])
 
             update.message.reply_text("❕ You're ready to play!")
 
@@ -159,9 +188,7 @@ class PlayerHandlers(BaseHandlers):
         try:
             update.message.reply_text(update.message.text)  # TODO
             if update.message.text == "J'aime les loutres":
-                self.players_instance.cache[player_id]["achievements"].append(
-                    ACHIEVEMENTS_ID["misc"]["loutres"]["id"]
-                )
+                self.players_instance.cache[player_id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["loutres"]["id"])
             self.players_instance.cache[player_id]["from_chat"] += 2
             self.players_instance.cache[player_id]["cooldown"]["counter"] += 1
         except RetryAfter as e:
@@ -177,9 +204,7 @@ class PlayerHandlers(BaseHandlers):
     def quickmode(self, update: Update, context: CallbackContext) -> None:
         user = update.effective_user
         kb_markup = ReplyKeyboardMarkup([[KeyboardButton("Blablabla")]])
-        update.message.reply_text(
-            "Simply press the big keyboard button to use quickmode!", reply_markup=kb_markup
-        )
+        update.message.reply_text("Simply press the big keyboard button to use quickmode!", reply_markup=kb_markup)
         self.logger.info("{} requested quickmode".format(user.first_name))
 
     def stop_bot(self, update: Update, context: CallbackContext) -> None:
@@ -188,9 +213,7 @@ class PlayerHandlers(BaseHandlers):
 
         obj = self.players_instance.Model.get(self.players_instance.Model.id == player_id)
         obj.delete_instance()
-        self.players_instance.Model.delete().where(
-            self.players_instance.Model.id == player_id
-        ).execute()
+        self.players_instance.Model.delete().where(self.players_instance.Model.id == player_id).execute()
         remove_job_if_exists(str(player_id), context)
 
         try:
@@ -219,17 +242,14 @@ class PlayerHandlers(BaseHandlers):
             ]
         )
         message += "*Achievements*\n"
-        message += "– Unlocked {} achievements out of {}\.\n".format(
-            sum(medals.values()), MAX_ACHIEVEMENTS
-        )
-        message += "– {}\n".format(
-            ", ".join(["{} {}".format(qt, medal) for medal, qt in medals.items()])
-        )
+        message += "– Unlocked {} achievements out of {}\.\n".format(sum(medals.values()), MAX_ACHIEVEMENTS)
+        message += "– {}\n".format(", ".join(["{} {}".format(qt, medal) for medal, qt in medals.items()]))
         message += "\n"
 
         message += "*{}*\n".format("Messages")
         message += "– {} current {}\.\n".format(get_si(stats["messages"]["quantity"]), "messages")
         message += "– {} {} in total\.\n".format(get_si(stats["messages"]["total"]), "messages")
+        message += "– {} upgrades unlocked\.\n".format(len(self.players_instance.get_upgrades(player_id, "messages")))
         message += "\n"
 
         for item, attrs in stats.items():  # e.g., "contacts": {"unlock_at", ...}
@@ -237,9 +257,15 @@ class PlayerHandlers(BaseHandlers):
                 message += "*{}*\n".format(item.capitalize())
                 message += "– {} current {}\.\n".format(get_si(attrs["quantity"]), item)
                 message += "– {} {} in total\.\n".format(get_si(attrs["total"]), item)
+                message += "– {} upgrades unlocked\.\n".format(len(self.players_instance.get_upgrades(player_id, item)))
                 for currency, quantity in attrs["gain"].items():
                     message += "– Add {} {} per second\.\n".format(
-                        get_si(attrs["quantity"] * quantity, type="f"), currency
+                        get_si(
+                            accumulate_upgrades(item, stats[item]["upgrades"], stats[item]["gain"]["messages"])
+                            * stats[item]["quantity"],
+                            type="f",
+                        ),
+                        currency,
                     )
                 message += "\n"
 
@@ -288,36 +314,178 @@ class PlayerHandlers(BaseHandlers):
             update.message.reply_text(message, parse_mode="MarkdownV2")
         self.logger.info("{} requested achievements".format(update.effective_user.first_name))
 
+
+STATE_MAIN, STATE_BUY_SELL, STATE_UPGRADES, STATE_TOOLS = range(4)
+
+
+class PlayerInterfaceHandlers(BaseHandlers):
+    def __init__(self, players_instance, logger=None, media_folder=None):
+        command_handlers = [
+            ConversationHandler(
+                entry_points=[CommandHandler(["interface"], self.interface)],
+                states={
+                    STATE_MAIN: [
+                        CallbackQueryHandler(self.buy_sell, pattern="^{}$".format(STATE_BUY_SELL)),
+                        CallbackQueryHandler(self.upgrades, pattern="^{}$".format(STATE_UPGRADES)),
+                        # CallbackQueryHandler(self.tools, pattern="^{}$".format(STATE_TOOLS)),
+                    ],
+                    STATE_BUY_SELL: [
+                        CallbackQueryHandler(
+                            self.buy_sell, pattern="^{}[a-z]?[x|b|s]?(1|10|max)?$".format(STATE_BUY_SELL)
+                        ),
+                        CallbackQueryHandler(self.interface_again, pattern="^{}$".format(STATE_MAIN)),
+                    ],
+                    STATE_UPGRADES: [
+                        CallbackQueryHandler(self.upgrades, pattern="^{}[a-z]?[0-9]*$".format(STATE_UPGRADES)),
+                        CallbackQueryHandler(self.interface_again, pattern="^{}$".format(STATE_MAIN)),
+                    ],
+                    # STATE_TOOLS: [],
+                },
+                fallbacks=[CommandHandler(["interface"], self.interface)],
+            ),
+        ]
+        super().__init__(
+            command_handlers=command_handlers,
+            players_instance=players_instance,
+            logger=logger,
+            media_folder=media_folder,
+        )
+
     def interface(self, update: Update, context: CallbackContext):
         player_id = update.effective_user.id
         player, _ = self.players_instance.get_or_create(player_id)
         if update_cooldown_and_notify(player_id, self.players_instance, context):
             return
 
-        # The choice has been made
-        if update.callback_query and update.callback_query.data != "stop":  # Choices
-            stats = self.players_instance.get_stats(player_id)
-            query = update.callback_query
-            query.answer()
-            data = query.data
+        choices = [
+            [
+                InlineKeyboardButton("Get/Forfeit", callback_data=str(STATE_BUY_SELL)),
+            ]
+        ]
+        if player.upgrades:
+            choices.append(
+                [
+                    InlineKeyboardButton("Upgrades", callback_data=str(STATE_UPGRADES)),
+                ]
+            )
+        if player.tools:
+            choices.append(
+                [
+                    InlineKeyboardButton("Tools", callback_data=str(STATE_TOOLS)),
+                ]
+            )
+        reply_markup = InlineKeyboardMarkup(choices)
 
+        message = (
+            "*⌨️Main menu ⌨️*\n\n"
+            "Here you can get or forfeit items, upgrade them, and more\.\.\.\n\n"
+            "\.\.\. Given you have what it takes\."
+        )
+
+        update.message.reply_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
+
+        self.logger.info("{} requested the main menu".format(update.effective_user.first_name))
+
+        return STATE_MAIN
+
+    def interface_again(self, update: Update, context: CallbackContext):
+        player_id = update.effective_user.id
+        player, _ = self.players_instance.get_or_create(player_id)
+        if update_cooldown_and_notify(player_id, self.players_instance, context):
+            return
+
+        choices = [
+            [
+                InlineKeyboardButton("Get/Forfeit", callback_data=str(STATE_BUY_SELL)),
+            ]
+        ]
+        if player.upgrades:
+            choices.append(
+                [
+                    InlineKeyboardButton("Upgrades", callback_data=str(STATE_UPGRADES)),
+                ]
+            )
+        if player.tools:
+            choices.append(
+                [
+                    InlineKeyboardButton("Tools", callback_data=str(STATE_TOOLS)),
+                ]
+            )
+        reply_markup = InlineKeyboardMarkup(choices)
+
+        message = (
+            "*⌨️Main menu ⌨️*\n\n"
+            "Here you can get or forfeit items, upgrade them, and more\.\.\.\n\n"
+            "\.\.\. Given you have what it takes\."
+        )
+
+        query = update.callback_query
+        query.answer()
+        update.callback_query.edit_message_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
+
+        return STATE_MAIN
+
+    def buy_sell(self, update: Update, context: CallbackContext):
+        player_id = update.effective_user.id
+        query = update.callback_query
+        query.answer()
+        data = query.data
+
+        # Main
+        if data == str(STATE_BUY_SELL):
+            stats = self.players_instance.get_stats(player_id)
+            choices = []
+            for item, attrs in stats.items():  # e.g., "contacts": {"unlock_at", ...}
+                if "unlock_at" in attrs and stats[item]["unlocked"]:
+                    choices.append(
+                        InlineKeyboardButton(
+                            "{} {}".format(stats[item]["symbol"], item.capitalize()),
+                            callback_data="{}{}x".format(STATE_BUY_SELL, stats[item]["id"]),
+                        )
+                    )
+
+            message = "*📈 Get/Forfeit 📈*\n\n"
+            if choices:
+                message += get_quantities(player_id, self.players_instance)
+                message += "\n\nSelect what you would like to bargain:"
+                choices = [choices[i : i + 2] for i in range(0, len(choices), 2)]
+            else:
+                message = "You don't have enough messages for now\.\.\."
+
+            choices.append([InlineKeyboardButton("Back", callback_data=str(STATE_MAIN))])
+            reply_markup = InlineKeyboardMarkup(choices)
+
+            update.callback_query.edit_message_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
+
+        # Choice has been made
+        else:
+            player, _ = self.players_instance.get_or_create(player_id)
+            stats = self.players_instance.get_stats(player_id)
+
+            buy = []
+            sell = []
+            message = "*📈 Get/Forfeit 📈*\n\n"
+
+            # Seeking for the correct one
             for item, attrs in stats.items():
                 if "id" in attrs:
-                    if data[0] == attrs["id"]:
+                    if data[1] == attrs["id"]:
                         base_prices = stats[item]["base_price"]
                         sell_price = {
-                            currency: int(price * RESALE_PERCENTAGE)
-                            for currency, price in base_prices.items()
+                            currency: int(price * RESALE_PERCENTAGE) for currency, price in base_prices.items()
                         }
 
                         # Buy
-                        if data[1] == "b":
-                            if data[2:] == "1":
+                        if data[2] == "b":
+                            if data[3:] == "1":
                                 qt = 1
-                            elif data[2:] == "10":
+                            elif data[3:] == "10":
                                 qt = 10
                             else:
-                                qt = int(data[2:])
+                                qt = CAP
+                                for currency, price in base_prices.items():
+                                    loss = get_max_to_buy(price, stats[item]["quantity"], stats[currency]["quantity"])
+                                    qt = min(qt, loss)
                             for currency, price in base_prices.items():
                                 loss = get_price_for_n(price, stats[item]["quantity"], qt)
                                 exec("player.{} -= loss".format(currency))
@@ -329,29 +497,30 @@ class PlayerHandlers(BaseHandlers):
                             if 10 <= stats[item]["quantity"]:
                                 ach = power_10(stats[item]["quantity"])
                                 while ach >= 10:
-                                    self.players_instance.cache[update.effective_user.id][
-                                        "achievements"
-                                    ].append(ACHIEVEMENTS_ID[item]["quantity{}".format(ach)]["id"])
+                                    self.players_instance.cache[update.effective_user.id]["achievements"].append(
+                                        ACHIEVEMENTS_ID[item]["quantity{}".format(ach)]["id"]
+                                    )
                                     ach //= 10
                             if 10 <= stats[item]["total"]:
                                 ach = power_10(stats[item]["total"])
                                 while ach >= 10:
-                                    self.players_instance.cache[update.effective_user.id][
-                                        "achievements"
-                                    ].append(ACHIEVEMENTS_ID[item]["total{}".format(ach)]["id"])
+                                    self.players_instance.cache[update.effective_user.id]["achievements"].append(
+                                        ACHIEVEMENTS_ID[item]["total{}".format(ach)]["id"]
+                                    )
                                     ach //= 10
 
                             self.players_instance.update(player_id, context)
+
                         # Sell
-                        elif data[1] == "s":
-                            if data[2:] == "1":
+                        elif data[2] == "s":
+                            if data[3:] == "1":
                                 qt = 1
-                            elif data[2:] == "10":
+                            elif data[3:] == "10":
                                 qt = 10
                             else:
                                 qt = stats[item]["quantity"]
                             for currency, price in sell_price.items():
-                                gain = -get_price_for_n(price, stats[item]["quantity"], -qt)
+                                gain = get_price_for_n(price, stats[item]["quantity"], -qt)
                                 exec("player.{} += gain".format(currency))
                                 exec("player.{}_total += gain".format(currency))
                             exec("player.{} -= qt".format(item))
@@ -360,19 +529,17 @@ class PlayerHandlers(BaseHandlers):
 
                             self.players_instance.update(player_id, context)
 
-                        message = "*🧮 Interface 🧮*\n\n*{}*\n".format(item.capitalize())
-                        message += "You have {} {}\.\n".format(
-                            get_si(stats[item]["quantity"]), item
-                        )
-                        message += "📈 Join:"
+                        message += "*{} {}*\n".format(stats[item]["symbol"], item.capitalize())
+                        message += "You have {} {}\.\n\n".format(get_si(stats[item]["quantity"]), item)
+                        message += "💸 Cost to Get:\n"
                         for currency, price in base_prices.items():
                             loss = get_price_for_n(price, stats[item]["quantity"], 1)
-                            message += " –{} {} ".format(loss, currency)
+                            message += "– {} {}\n".format(get_si(loss), currency)
                         message += "\n"
-                        message += "📉 Leave:"
+                        message += "💰 Gain for Forfeit:\n"
                         for currency, price in sell_price.items():
-                            gain = -get_price_for_n(price, stats[item]["quantity"], -1)
-                            message += " \+{} {} ".format(gain, currency)
+                            gain = get_price_for_n(price, stats[item]["quantity"], -1)
+                            message += "– {} {}\n".format(get_si(gain), currency)
 
                         # Select
                         ## Buy
@@ -380,134 +547,187 @@ class PlayerHandlers(BaseHandlers):
                         buy = []
                         can_buy = CAP
                         for currency, price in base_prices.items():
-                            loss = get_max_to_buy(
-                                price, stats[item]["quantity"], stats[currency]["quantity"]
-                            )
+                            loss = get_max_to_buy(price, stats[item]["quantity"], stats[currency]["quantity"])
                             can_buy = min(can_buy, loss)
                         if can_buy >= 1:
                             buy.append(
                                 InlineKeyboardButton(
-                                    "📈 Join 1 {}".format(item),
-                                    callback_data="{}b1".format(attrs["id"]),
+                                    "Get 1 {}".format(item[:-1]),
+                                    callback_data="{}{}b1".format(STATE_BUY_SELL, attrs["id"]),
                                 )
                             )
                             if can_buy >= 10:
                                 buy.append(
                                     InlineKeyboardButton(
-                                        "📈 Join 10 {}".format(item),
-                                        callback_data="{}b10".format(attrs["id"]),
+                                        "Get 10 {}".format(item),
+                                        callback_data="{}{}b10".format(STATE_BUY_SELL, attrs["id"]),
                                     )
+                                )
+                            else:
+                                buy.append(
+                                    InlineKeyboardButton(" ", callback_data="{}{}x".format(STATE_BUY_SELL, attrs["id"]))
                                 )
                             buy.append(
                                 InlineKeyboardButton(
-                                    "📈 Join Max {}".format(item),
-                                    callback_data="{}b{}".format(attrs["id"], can_buy),
+                                    "Get max {}".format(item),
+                                    callback_data="{}{}bmax".format(STATE_BUY_SELL, attrs["id"]),
                                 )
                             )
+                        else:
+                            buy = [
+                                InlineKeyboardButton("", callback_data="{}{}x".format(STATE_BUY_SELL, attrs["id"]))
+                            ] * 3
 
                         ## Sell
                         sell = []
                         if stats[item]["quantity"] >= 1:
                             sell.append(
                                 InlineKeyboardButton(
-                                    "📉 Leave 1 {}".format(item),
-                                    callback_data="{}s1".format(attrs["id"]),
+                                    "Forfeit 1 {}".format(item[:-1]),
+                                    callback_data="{}{}s1".format(STATE_BUY_SELL, attrs["id"]),
                                 )
                             )
                             if stats[item]["quantity"] >= 10:
                                 sell.append(
                                     InlineKeyboardButton(
-                                        "📉 Leave 10 {}".format(item),
-                                        callback_data="{}s10".format(attrs["id"]),
+                                        "Forfeit 10 {}".format(item),
+                                        callback_data="{}{}s10".format(STATE_BUY_SELL, attrs["id"]),
                                     )
+                                )
+                            else:
+                                sell.append(
+                                    InlineKeyboardButton("", callback_data="{}{}x".format(STATE_BUY_SELL, attrs["id"]))
                                 )
                             sell.append(
                                 InlineKeyboardButton(
-                                    "📉 Leave All {}".format(item),
-                                    callback_data="{}smax".format(attrs["id"]),
+                                    "Forfeit all {}".format(item),
+                                    callback_data="{}{}smax".format(STATE_BUY_SELL, attrs["id"]),
                                 )
                             )
+                        else:
+                            sell = [
+                                InlineKeyboardButton("", callback_data="{}{}x".format(STATE_BUY_SELL, attrs["id"]))
+                            ] * 3
 
-                        ## We found the correct
+                        ## We found the correct one
                         break
 
-            reply_markup = InlineKeyboardMarkup(
-                [buy, sell, [InlineKeyboardButton("Back", callback_data="stop")]]
-            )
+            buttons = list(map(list, zip(*[buy, sell])))
+            buttons.append([InlineKeyboardButton("Back", callback_data="{}".format(STATE_BUY_SELL))])
 
+            reply_markup = InlineKeyboardMarkup(buttons)
             try:
                 query.edit_message_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
-            except BadRequest:  # Not edit to be done
+            except BadRequest as e:  # Not edit to be done
+                print(str(e))
                 pass
 
-        else:  # Main
-            self.logger.info("{} requested the interface".format(update.effective_user.first_name))
+        return STATE_BUY_SELL
 
+    def upgrades(self, update: Update, context: CallbackContext):
+        player_id = update.effective_user.id
+        query = update.callback_query
+        query.answer()
+        data = query.data
+
+        # Main
+        if data == str(STATE_UPGRADES):
             stats = self.players_instance.get_stats(player_id)
             choices = []
-            for item, attrs in stats.items():  # e.g., "contacts": {"unlock_at", ...}
-                if "unlock_at" in attrs and stats[item]["unlocked"]:
+            for item, upgrades in UPGRADES.items():
+                if stats[item]["unlocked"]:
                     choices.append(
                         InlineKeyboardButton(
-                            item.capitalize(), callback_data="{}x".format(stats[item]["id"])
+                            "{} {}".format(stats[item]["symbol"], item.capitalize()),
+                            callback_data="{}{}".format(STATE_UPGRADES, stats[item]["id"]),
                         )
                     )
 
+            message = "*🆙 Upgrades 🆙*\n\n"
             if choices:
-                message = "*🧮 Interface 🧮*\n\n"
-                message += get_quantities(player_id, self.players_instance)
-                message += "\n\nSelect what you would like to bargain:"
-                reply_markup = InlineKeyboardMarkup([choices])
-            else:
-                message = "*Interface*\n\nYou don't have enough messages for now\.\.\."
-                reply_markup = None
-
-            if update.callback_query:  # "stop"
-                update.callback_query.edit_message_text(
-                    message, reply_markup=reply_markup, parse_mode="MarkdownV2"
+                message += (
+                    "Upgrades are way to enhance the production of messages\.\n\n"
+                    "Select what you would like to upgrade:"
                 )
+                choices = [choices[i : i + 2] for i in range(0, len(choices), 2)]
             else:
-                update.message.reply_text(
-                    message, reply_markup=reply_markup, parse_mode="MarkdownV2"
-                )
+                message = "You cannot upgrade anything for now\.\.\."
 
+            choices.append([InlineKeyboardButton("Back", callback_data=str(STATE_MAIN))])
+            reply_markup = InlineKeyboardMarkup(choices)
 
-class AdminHandlers(BaseHandlers):
-    def __init__(self, players_instance, logger=None, media_folder=None):
-        command_handlers = [
-            CommandHandler(["debug", "cheat", "rich"], self.be_rich),
-            CommandHandler(["notify"], self.notify_all),
-            CallbackQueryHandler(self.notify_all),
-        ]
-        super().__init__(
-            command_handlers=command_handlers,
-            players_instance=players_instance,
-            logger=logger,
-            media_folder=media_folder,
-        )
+            update.callback_query.edit_message_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
 
-    def be_rich(self, update: Update, context: CallbackContext) -> None:
-        player_id = update.effective_user.id
-        if player_id == ADMIN_CHAT:
+        # Choice has been made
+        else:
             player, _ = self.players_instance.get_or_create(player_id)
-            player.messages += 10_000_000_000
-            player.messages_total += 10_000_000_000
-            player.save()
-        update.message.reply_text("Sent 10'000'000'000 messages.")
-        self.logger.info("{} cheated.".format(update.effective_user.first_name))
+            stats = self.players_instance.get_stats(player_id)
+            item = id_to_item_name(data[1])
+            current_upgrades = set(self.players_instance.get_upgrades(player_id, item))
 
-    def notify_all(self, update: Update, context: CallbackContext) -> None:
-        if update.effective_user.id == ADMIN_CHAT:
-            if update.message.reply_to_message:
-                for player in self.players_instance.Model.select():
-                    context.bot.send_message(player.id, update.message.reply_to_message.text)
-                self.logger.info(
-                    "{} sent a global message.".format(update.effective_user.first_name)
+            print("DATA", data)
+
+            if data[2:]:
+                upgrade_id = int(data[2:])
+                for currency, quantity in UPGRADES[item][upgrade_id]["cost"].items():
+                    exec("player.{} -= quantity".format(currency))
+                current_upgrades.add(upgrade_id)
+                exec('player.{}_upgrades = ", ".join([str(num) for num in current_upgrades if num])'.format(item))
+                player.save()
+
+            message = "*🆙 Upgrades 🆙*\n\n"
+            message += "*{} {}*\n\n".format(stats[item]["symbol"], item.capitalize())
+            message += "Available upgrades:\n"
+            available_upgrades = []
+
+            for upgrade_id, attrs in UPGRADES[item].items():
+                if upgrade_id not in current_upgrades:
+                    available = True
+                    for currency, quantity in attrs["conditions"].items():
+                        if stats[currency]["total"] < quantity:
+                            available = False
+                            break
+                    if available:
+                        message += (
+                            "*\[{}\] {}*\n"
+                            "_{}_\n"
+                            "Costs: {}\n".format(
+                                upgrade_id,
+                                attrs["title"],
+                                attrs["text"],
+                                ", ".join(
+                                    [
+                                        "{} {}".format(get_si(quantity), currency)
+                                        for currency, quantity in attrs["cost"].items()
+                                    ]
+                                ),
+                            )
+                        )
+                        can_buy = True
+                        for currency, quantity in UPGRADES[item][upgrade_id]["cost"].items():
+                            if stats[currency]["quantity"] < quantity:
+                                can_buy = False
+                                break
+                        if can_buy:
+                            available_upgrades.append(upgrade_id)
+
+            if not available_upgrades:
+                message += "None for the moment\."
+
+            buttons = [
+                InlineKeyboardButton(
+                    upgrade_id, callback_data="{}{}{}".format(STATE_UPGRADES, stats[item]["id"], upgrade_id)
                 )
-            else:
-                text_to_send = "🗣 Message from admin 🗣\n{}".format(
-                    update.effective_message.text.split(" ", 1)[1]
-                )
-                update.message.reply_text("This is a preview:").reply_text(text_to_send).reply_text(
-                    "Reply /notify to the previous message to send it."
-                )
+                for upgrade_id in available_upgrades
+            ]
+            buttons = [buttons[i : i + 4] for i in range(0, len(buttons), 4)]
+            buttons.append([InlineKeyboardButton("Back", callback_data="{}".format(STATE_UPGRADES))])
+
+            reply_markup = InlineKeyboardMarkup(buttons)
+            try:
+                query.edit_message_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
+            except BadRequest as e:  # Not edit to be done
+                print(str(e))
+                pass
+
+        return STATE_UPGRADES

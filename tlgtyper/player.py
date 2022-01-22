@@ -14,6 +14,9 @@ from tlgtyper.texts import get_quantities
 
 
 class Players:
+    def __init__(self, logger):
+        self.logger = logger
+
     class Model(Model):
         # Self
         id = BigIntegerField(unique=True)
@@ -22,26 +25,33 @@ class Players:
 
         # Stats
         messages = FloatField(default=0)
-        messages_state = IntegerField(default=1)  # Unlocked by default
+        messages_state = IntegerField(default=1)  # bool; Unlocked by default
         messages_total = FloatField(default=0)
+        messages_upgrades = CharField(default="")  # "xx,yy"
 
         contacts = FloatField(default=0)
-        contacts_state = IntegerField(default=0)
+        contacts_state = IntegerField(default=0)  # bool
         contacts_total = FloatField(default=0)
+        contacts_upgrades = CharField(default="")  # "xx,yy"
 
         groups = FloatField(default=0)
-        groups_state = IntegerField(default=0)
+        groups_state = IntegerField(default=0)  # bool
         groups_total = FloatField(default=0)
+        groups_upgrades = CharField(default="")  # "xx,yy"
 
         channels = FloatField(default=0)
-        channels_state = IntegerField(default=0)
+        channels_state = IntegerField(default=0)  # bool
         channels_total = FloatField(default=0)
+        channels_upgrades = CharField(default="")  # "xx,yy"
 
         supergroups = FloatField(default=0)
-        supergroups_state = IntegerField(default=0)
+        supergroups_state = IntegerField(default=0)  # bool
         supergroups_total = FloatField(default=0)
+        supergroups_upgrades = CharField(default="")  # "xx,yy"
 
-        achievements = CharField(default="")
+        upgrades = IntegerField(default=0)  # bool
+        tools = IntegerField(default=0)  # bool
+        achievements = CharField(default="")  # "xx,yy"
 
     cache = defaultdict(
         lambda: {
@@ -65,6 +75,7 @@ class Players:
                     "unlocked": eval("player.{}_state".format(item), scope),
                     "quantity": eval("player.{}".format(item), scope),
                     "total": eval("player.{}_total".format(item), scope),
+                    "upgrades": eval("player.{}_upgrades".format(item), scope),
                 },
             }
             for item, attrs in ITEMS.items()
@@ -75,8 +86,13 @@ class Players:
         return result
 
     def get_achievements(self, player_id: int):
-        user, _ = self.get_or_create(player_id)
-        return [int(num) for num in user.achievements.split(",") if num]
+        player, _ = self.get_or_create(player_id)
+        return [int(num) for num in player.achievements.split(",") if num]
+
+    def get_upgrades(self, player_id: int, item: str):
+        player, _ = self.get_or_create(player_id)
+        upgrades = eval("player.{}_upgrades".format(item))
+        return [int(num) for num in upgrades.split(",") if num]
 
     def update_unlocks(self, player_id: int) -> None:
         player, _ = self.get_or_create(player_id)
@@ -85,18 +101,25 @@ class Players:
         for item, attrs in stats.items():  # e.g., "contacts": {"unlock_at", ...}
             if "unlock_at" in attrs and not stats[item]["unlocked"]:
                 unlock = True
-                for unlock_item, unlock_quantity in attrs[
-                    "unlock_at"
-                ].items():  # e.g., "messages": 10
+                for unlock_item, unlock_quantity in attrs["unlock_at"].items():  # e.g., "messages": 10
                     if stats[unlock_item]["total"] < unlock_quantity:
                         unlock = False
                         break
                 if unlock:
                     exec("player.{}_state = 1".format(item))
-                    player.save()
-                    Players.cache[player_id]["achievements"].append(
-                        ACHIEVEMENTS_ID[item]["unlocked"]["id"]
-                    )
+                    Players.cache[player_id]["achievements"].append(ACHIEVEMENTS_ID[item]["unlocked"]["id"])
+
+        # Upgrades
+        if stats["messages"]["total"] >= 420:
+            player.upgrades = 1
+            Players.cache[player_id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["upgrades"]["id"])
+
+        # Tools
+        # if stats["messages"]["total"] >= 1_337:
+        #     player.tools = 1
+        #     Players.cache[player_id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["tools"]["id"])
+
+        player.save()
 
     def update_pinned_message(
         self, player_id: int, context: CallbackContext
@@ -110,17 +133,19 @@ class Players:
         try:
             context.bot.edit_message_text(message, player_id, user.pinned_message)
         except RetryAfter as e:
-            # self.logger.error(str(e))
+            self.logger.error(str(e))
             retry_after = int(str(e).split("in ")[1].split(".0")[0])
             self.cache[player_id]["cooldown"]["retry_after"] = retry_after
-        except BadRequest as e:  # Edit problem
-            context.bot.send_message(
-                player_id,
-                "Oops\! It seems like I did not find the pinned message\. Could you use /reset, please\?",
-                parse_mode="MarkdownV2",
-            )
-            # self.logger.error(str(e))
-            remove_job_if_exists(str(player_id), context)
+        # Edit problem
+        except BadRequest as e:
+            if "Message to edit not found" in str(e):
+                context.bot.send_message(
+                    player_id,
+                    "Oops\! It seems like I did not find the pinned message\. Could you use /reset, please\?",
+                    parse_mode="MarkdownV2",
+                )
+                remove_job_if_exists(str(player_id), context)
+            self.logger.error(str(e))
 
     def update_achievements(
         self, player_id: int, context: CallbackContext

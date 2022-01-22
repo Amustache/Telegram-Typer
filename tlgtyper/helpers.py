@@ -25,10 +25,10 @@ def get_si(number, type="'", size=3):
         exp = 0
         while number // 10 ** (exp * size):
             exp += 1
-        exp -= 1
-        return "{:.2f}".format(int(number / 10 ** (exp * size))).rstrip("0").rstrip(
-            "."
-        ) + "{}".format(suf[exp])
+        exp -= 1 if exp else 0
+        return "{:.2f}".format(int(number / 10 ** (exp * size))).rstrip("0").rstrip(".") + "{}".format(
+            suf[min(exp, len(suf) - 1)]
+        )
     elif type == "'":
         return "{:,}".format(int(number)).replace(",", "'")
     elif type == "f":
@@ -42,9 +42,7 @@ def send_typing_action(func):
 
     @wraps(func)
     def command_func(update, context, *args, **kwargs):
-        context.bot.send_chat_action(
-            chat_id=update.effective_message.chat_id, action=ChatAction.TYPING
-        )
+        context.bot.send_chat_action(chat_id=update.effective_message.chat_id, action=ChatAction.TYPING)
         sleep(len(update.message.text) // 20)  # This is based on my max WPM hehe.
         return func(update, context, *args, **kwargs)
 
