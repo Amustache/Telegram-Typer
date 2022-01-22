@@ -11,11 +11,12 @@ from telegram.error import BadRequest, RetryAfter
 from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler, Filters, MessageHandler
 
 
-from parameters import RESALE_PERCENTAGE
+from parameters import CAP, RESALE_PERCENTAGE
 from secret import ADMIN_CHAT, BOT_LINK
 from tlgtyper.achievements import ACHIEVEMENTS, ACHIEVEMENTS_ID, MAX_ACHIEVEMENTS
 from tlgtyper.cooldown import update_cooldown_and_notify
 from tlgtyper.helpers import get_si, power_10, send_typing_action
+from tlgtyper.items import get_max_to_buy, get_price_for_n
 from tlgtyper.jobs import remove_job_if_exists, update_job
 from tlgtyper.texts import get_quantities, HELP_COMMANDS
 
@@ -293,6 +294,7 @@ class PlayerHandlers(BaseHandlers):
         if update_cooldown_and_notify(player_id, self.players_instance, context):
             return
 
+        # The choice has been made
         if update.callback_query and update.callback_query.data != "stop":  # Choices
             stats = self.players_instance.get_stats(player_id)
             query = update.callback_query
@@ -302,20 +304,23 @@ class PlayerHandlers(BaseHandlers):
             for item, attrs in stats.items():
                 if "id" in attrs:
                     if data[0] == attrs["id"]:
-                        buy_price = stats[item]["base_price"]
-                        sell_price = {k: int(v * RESALE_PERCENTAGE) for k, v in buy_price.items()}
+                        base_prices = stats[item]["base_price"]
+                        sell_price = {
+                            currency: int(price * RESALE_PERCENTAGE)
+                            for currency, price in base_prices.items()
+                        }
 
-                        if data[1] == "b":  # Buy
+                        # Buy
+                        if data[1] == "b":
                             if data[2:] == "1":
                                 qt = 1
                             elif data[2:] == "10":
                                 qt = 10
                             else:
-                                qt = 999_999_999_999_999
-                                for currency, quantity in buy_price.items():
-                                    qt = min(qt, eval("player.{} // quantity".format(currency)))
-                            for currency, quantity in buy_price.items():
-                                exec("player.{} -= qt * quantity".format(currency))
+                                qt = int(data[2:])
+                            for currency, price in base_prices.items():
+                                loss = get_price_for_n(price, stats[item]["quantity"], qt)
+                                exec("player.{} -= loss".format(currency))
                             exec("player.{} += qt".format(item))
                             exec("player.{}_total += qt".format(item))
                             player.save()
@@ -337,16 +342,18 @@ class PlayerHandlers(BaseHandlers):
                                     ach //= 10
 
                             self.players_instance.update(player_id, context)
-                        elif data[1] == "s":  # Sell
+                        # Sell
+                        elif data[1] == "s":
                             if data[2:] == "1":
                                 qt = 1
                             elif data[2:] == "10":
                                 qt = 10
                             else:
-                                qt = eval("player.{}".format(item))
-                            for currency, quantity in sell_price.items():
-                                exec("player.{} += qt * quantity".format(currency))
-                                exec("player.{}_total += qt * quantity".format(currency))
+                                qt = stats[item]["quantity"]
+                            for currency, price in sell_price.items():
+                                gain = -get_price_for_n(price, stats[item]["quantity"], -qt)
+                                exec("player.{} += gain".format(currency))
+                                exec("player.{}_total += gain".format(currency))
                             exec("player.{} -= qt".format(item))
                             player.save()
                             stats = self.players_instance.get_stats(player_id)
@@ -358,18 +365,25 @@ class PlayerHandlers(BaseHandlers):
                             get_si(stats[item]["quantity"]), item
                         )
                         message += "📈 Join:"
-                        for currency, quantity in buy_price.items():
-                            message += " –{} {} ".format(quantity, currency)
+                        for currency, price in base_prices.items():
+                            loss = get_price_for_n(price, stats[item]["quantity"], 1)
+                            message += " –{} {} ".format(loss, currency)
                         message += "\n"
                         message += "📉 Leave:"
-                        for currency, quantity in sell_price.items():
-                            message += " \+{} {} ".format(quantity, currency)
+                        for currency, price in sell_price.items():
+                            gain = -get_price_for_n(price, stats[item]["quantity"], -1)
+                            message += " \+{} {} ".format(gain, currency)
 
                         # Select
+                        ## Buy
+                        # It's in there that we test for availability
                         buy = []
-                        can_buy = 999_999_999_999_999
-                        for currency, quantity in buy_price.items():
-                            can_buy = min(can_buy, stats[currency]["quantity"] // quantity)
+                        can_buy = CAP
+                        for currency, price in base_prices.items():
+                            loss = get_max_to_buy(
+                                price, stats[item]["quantity"], stats[currency]["quantity"]
+                            )
+                            can_buy = min(can_buy, loss)
                         if can_buy >= 1:
                             buy.append(
                                 InlineKeyboardButton(
@@ -387,10 +401,11 @@ class PlayerHandlers(BaseHandlers):
                             buy.append(
                                 InlineKeyboardButton(
                                     "📈 Join Max {}".format(item),
-                                    callback_data="{}bmax".format(attrs["id"]),
+                                    callback_data="{}b{}".format(attrs["id"], can_buy),
                                 )
                             )
 
+                        ## Sell
                         sell = []
                         if stats[item]["quantity"] >= 1:
                             sell.append(
@@ -413,6 +428,7 @@ class PlayerHandlers(BaseHandlers):
                                 )
                             )
 
+                        ## We found the correct
                         break
 
             reply_markup = InlineKeyboardMarkup(
