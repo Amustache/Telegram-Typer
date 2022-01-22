@@ -249,6 +249,7 @@ class PlayerHandlers(BaseHandlers):
         message += "*{}*\n".format("Messages")
         message += "– {} current {}\.\n".format(get_si(stats["messages"]["quantity"]), "messages")
         message += "– {} {} in total\.\n".format(get_si(stats["messages"]["total"]), "messages")
+        message += "– {} upgrades unlocked\.\n".format(len(self.players_instance.get_upgrades(player_id, "messages")))
         message += "\n"
 
         for item, attrs in stats.items():  # e.g., "contacts": {"unlock_at", ...}
@@ -256,6 +257,7 @@ class PlayerHandlers(BaseHandlers):
                 message += "*{}*\n".format(item.capitalize())
                 message += "– {} current {}\.\n".format(get_si(attrs["quantity"]), item)
                 message += "– {} {} in total\.\n".format(get_si(attrs["total"]), item)
+                message += "– {} upgrades unlocked\.\n".format(len(self.players_instance.get_upgrades(player_id, item)))
                 for currency, quantity in attrs["gain"].items():
                     message += "– Add {} {} per second\.\n".format(
                         get_si(
