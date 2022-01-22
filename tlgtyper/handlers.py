@@ -393,19 +393,19 @@ class PlayerInterfaceHandlers(BaseHandlers):
 
         choices = [
             [
-                InlineKeyboardButton("Get/Forfeit", callback_data=str(STATE_BUY_SELL)),
+                InlineKeyboardButton("📈 Get/Forfeit 📉", callback_data=str(STATE_BUY_SELL)),
             ]
         ]
         if player.upgrades:
             choices.append(
                 [
-                    InlineKeyboardButton("Upgrades", callback_data=str(STATE_UPGRADES)),
+                    InlineKeyboardButton("🆙 Upgrades 🆙", callback_data=str(STATE_UPGRADES)),
                 ]
             )
         if player.tools:
             choices.append(
                 [
-                    InlineKeyboardButton("Tools", callback_data=str(STATE_TOOLS)),
+                    InlineKeyboardButton("🛠 Tools 🛠", callback_data=str(STATE_TOOLS)),
                 ]
             )
         reply_markup = InlineKeyboardMarkup(choices)
@@ -430,19 +430,19 @@ class PlayerInterfaceHandlers(BaseHandlers):
 
         choices = [
             [
-                InlineKeyboardButton("Get/Forfeit", callback_data=str(STATE_BUY_SELL)),
+                InlineKeyboardButton("📈 Get/Forfeit 📉", callback_data=str(STATE_BUY_SELL)),
             ]
         ]
         if player.upgrades:
             choices.append(
                 [
-                    InlineKeyboardButton("Upgrades", callback_data=str(STATE_UPGRADES)),
+                    InlineKeyboardButton("🆙 Upgrades 🆙", callback_data=str(STATE_UPGRADES)),
                 ]
             )
         if player.tools:
             choices.append(
                 [
-                    InlineKeyboardButton("Tools", callback_data=str(STATE_TOOLS)),
+                    InlineKeyboardButton("🛠 Tools 🛠", callback_data=str(STATE_TOOLS)),
                 ]
             )
         reply_markup = InlineKeyboardMarkup(choices)
@@ -478,7 +478,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
                         )
                     )
 
-            message = "*📈 Get/Forfeit 📈*\n\n"
+            message = "*📈 Get/Forfeit 📉*\n\n"
             if choices:
                 message += get_quantities(player_id, self.players_instance)
                 message += "\n\nSelect what you would like to bargain:"
@@ -486,7 +486,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
             else:
                 message = "You don't have enough messages for now\.\.\."
 
-            choices.append([InlineKeyboardButton("Back", callback_data=str(STATE_MAIN))])
+            choices.append([InlineKeyboardButton("↩️ Back", callback_data=str(STATE_MAIN))])
             reply_markup = InlineKeyboardMarkup(choices)
 
             update.callback_query.edit_message_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
@@ -498,7 +498,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
 
             buy = []
             sell = []
-            message = "*📈 Get/Forfeit 📈*\n\n"
+            message = "*📈 Get/Forfeit 📉*\n\n"
 
             # Seeking for the correct one
             for item, attrs in stats.items():
@@ -647,7 +647,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
                         break
 
             buttons = list(map(list, zip(*[buy, sell])))
-            buttons.append([InlineKeyboardButton("Back", callback_data="{}".format(STATE_BUY_SELL))])
+            buttons.append([InlineKeyboardButton("↩️ Back", callback_data="{}".format(STATE_BUY_SELL))])
 
             reply_markup = InlineKeyboardMarkup(buttons)
             try:
@@ -687,7 +687,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
             else:
                 message = "You cannot upgrade anything for now\.\.\."
 
-            choices.append([InlineKeyboardButton("Back", callback_data=str(STATE_MAIN))])
+            choices.append([InlineKeyboardButton("↩️ Back", callback_data=str(STATE_MAIN))])
             reply_markup = InlineKeyboardMarkup(choices)
 
             update.callback_query.edit_message_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
@@ -757,7 +757,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
                 for upgrade_id in available_upgrades
             ]
             buttons = [buttons[i : i + 4] for i in range(0, len(buttons), 4)]
-            buttons.append([InlineKeyboardButton("Back", callback_data="{}".format(STATE_UPGRADES))])
+            buttons.append([InlineKeyboardButton("↩️ Back", callback_data="{}".format(STATE_UPGRADES))])
 
             reply_markup = InlineKeyboardMarkup(buttons)
             try:
