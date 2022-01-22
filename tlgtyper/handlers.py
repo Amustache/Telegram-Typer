@@ -679,6 +679,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
             message += "*{} {}*\n\n".format(stats[item]["symbol"], item.capitalize())
             message += "Available upgrades:\n"
             available_upgrades = []
+            some_upgrades = False
 
             for upgrade_id, attrs in UPGRADES[item].items():
                 if upgrade_id not in current_upgrades:
@@ -688,6 +689,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
                             available = False
                             break
                     if available:
+                        some_upgrades = True
                         message += (
                             "*\[{}\] {}*\n"
                             "_{}_\n"
@@ -711,7 +713,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
                         if can_buy:
                             available_upgrades.append(upgrade_id)
 
-            if not available_upgrades:
+            if not some_upgrades:
                 message += "None for the moment\."
 
             buttons = [
