@@ -96,14 +96,16 @@ class AdminHandlers(BaseHandlers):
             player.messages_total += 10_000_000_000
             player.save()
         update.message.reply_text("Sent 10'000'000'000 messages.")
-        self.logger.info("{} cheated.".format(update.effective_user.first_name))
+        self.logger.info("[{}] {} cheated.".format(player_id, update.effective_user.first_name))
 
     def notify_all(self, update: Update, context: CallbackContext) -> None:
         if update.effective_user.id == ADMIN_CHAT:
             if update.message.reply_to_message:
                 for player in self.players_instance.Model.select():
                     context.bot.send_message(player.id, update.message.reply_to_message.text)
-                self.logger.info("{} sent a global message.".format(update.effective_user.first_name))
+                self.logger.info(
+                    "[{}] {} sent a global message.".format(update.effective_user.id, update.effective_user.first_name)
+                )
             else:
                 text_to_send = "🗣 Message from admin 🗣\n{}".format(update.effective_message.text.split(" ", 1)[1])
                 update.message.reply_text("This is a preview:").reply_text(text_to_send).reply_text(
@@ -138,7 +140,7 @@ class PlayerHandlers(BaseHandlers):
                 "Press /new_game to play!"
             )
 
-        self.logger.info("{} started the bot".format(user.first_name))
+        self.logger.info("[{}] {} started the bot".format(user.id, user.first_name))
 
     def new_game(self, update: Update, context: CallbackContext):
         user = update.effective_user
@@ -164,9 +166,9 @@ class PlayerHandlers(BaseHandlers):
             update.message.reply_text(
                 "Now, I am going to pin your counter to this conversation, so that you can see your progress!"
             )
-            self.logger.info("{} started a new game".format(user.first_name))
+            self.logger.info("[{}] {} started a new game".format(player_id, user.first_name))
         else:
-            self.logger.info("{} did a reset".format(user.first_name))
+            self.logger.info("[{}] {} did a reset".format(player_id, user.first_name))
 
         counter = update.message.reply_text(
             "Send a text (not a command!) to the bot to see this message update.\n"
@@ -189,6 +191,7 @@ class PlayerHandlers(BaseHandlers):
         player_id = user.id
 
         if update_cooldown_and_notify(player_id, self.players_instance, context):
+            self.logger.error("[{}] {} is cooldown'd", player_id, user.first_name)
             return
 
         try:
@@ -222,14 +225,14 @@ class PlayerHandlers(BaseHandlers):
 
                 update.message.reply_text("[Quickmode] Got {} {}!".format(qt, item.capitalize()))
         except RetryAfter as e:
-            self.logger.error(str(e))
+            self.logger.error("[{}] {}".format(player_id, str(e)))
             retry_after = int(str(e).split("in ")[1].split(".0")[0])
             self.players_instance.cache[player_id]["cooldown"]["retry_after"] = retry_after
 
     def help_commands(self, update: Update, context: CallbackContext) -> None:
         user = update.effective_user
         update.message.reply_text(HELP_COMMANDS)  # TODO
-        self.logger.info("{} requested help".format(user.first_name))
+        self.logger.info("[{}] {} requested help".format(user.id, user.first_name))
 
     def quickmode(self, update: Update, context: CallbackContext) -> None:
         user = update.effective_user
@@ -244,7 +247,7 @@ class PlayerHandlers(BaseHandlers):
         buttons = [buttons[i : i + 3] for i in range(0, len(buttons), 3)]
         kb_markup = ReplyKeyboardMarkup([[KeyboardButton(random.choice(BLABLA_TEXT))], *buttons])
         update.message.reply_text("Simply press the big keyboard button to use quickmode!", reply_markup=kb_markup)
-        self.logger.info("{} requested quickmode".format(user.first_name))
+        self.logger.info("[{}] {} requested quickmode".format(player_id, user.first_name))
 
     def stop_bot(self, update: Update, context: CallbackContext) -> None:
         user = update.effective_user
@@ -261,7 +264,7 @@ class PlayerHandlers(BaseHandlers):
             pass
 
         update.message.reply_text("Game stopped, account deleted.")  # TODO
-        self.logger.info("{} stopped the bot".format(user.first_name))
+        self.logger.info("[{}] {} stopped the bot".format(player_id, user.first_name))
 
     def show_stats(self, update: Update, context: CallbackContext) -> None:
         user = update.effective_user
@@ -269,7 +272,7 @@ class PlayerHandlers(BaseHandlers):
 
         stats = self.players_instance.get_stats(player_id)
         message = "*📊 Stats 📊*\n_Stats of {} as of {}\._\n\n".format(
-            update.effective_user.first_name, datetime.now().strftime("%B %d, %Y at %H:%M GMT\+1")
+            update.effective_user.first_name, datetime.now().strftime("%B %d, %Y at %H:%M GMT")
         )
 
         user_achievements = self.players_instance.get_achievements(player_id)
@@ -311,7 +314,7 @@ class PlayerHandlers(BaseHandlers):
         message += BOT_LINK
 
         update.message.reply_text(message, parse_mode="MarkdownV2")
-        self.logger.info("{} requested stats".format(update.effective_user.first_name))
+        self.logger.info("[{}] {} requested stats".format(player_id, update.effective_user.first_name))
 
     def show_achievements(self, update: Update, context: CallbackContext) -> None:
         user = update.effective_user
@@ -324,18 +327,20 @@ class PlayerHandlers(BaseHandlers):
             try:
                 value = int(context.args[0], 16)
                 if value < 0 or value > 0xFF:
-                    raise ValueError
-            except ValueError:
+                    raise ValueError("Wrong achievement number: {}.".format(value))
+            except ValueError as e:
+                self.logger.warning("[{}] {}".format(player_id, str(e)))
                 update.message.reply_text("Usage: `/achievement` or `/achievement number`")
                 return
 
             try:
                 medal, title, text = ACHIEVEMENTS[value]
-            except (KeyError, ValueError):
+            except (KeyError, ValueError) as e:
+                self.logger.warning("[{}] {}".format(player_id, str(e)))
                 update.message.reply_text("Wrong achievement number.")
                 return
 
-            if not value in user_achievements:
+            if value not in user_achievements:
                 medal = question
                 text = "\[You don't have this achievement just yet\.\.\.\]"
             message = "*{} {} {}*\n_{}_".format(medal, title, medal, text)
@@ -351,7 +356,7 @@ class PlayerHandlers(BaseHandlers):
             message += "\n\nUse `/achievement number` to have more information\."
 
             update.message.reply_text(message, parse_mode="MarkdownV2")
-        self.logger.info("{} requested achievements".format(update.effective_user.first_name))
+        self.logger.info("[{}] {} requested achievements".format(player_id, update.effective_user.first_name))
 
 
 STATE_MAIN, STATE_BUY_SELL, STATE_UPGRADES, STATE_TOOLS = range(4)
@@ -395,6 +400,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
         player_id = update.effective_user.id
         player, _ = self.players_instance.get_or_create(player_id)
         if update_cooldown_and_notify(player_id, self.players_instance, context):
+            self.logger.error("[{}] {} is cooldown'd", player_id, update.effective_user.first_name)
             return
 
         choices = [
@@ -424,7 +430,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
 
         update.message.reply_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
 
-        self.logger.info("{} requested the main menu".format(update.effective_user.first_name))
+        self.logger.info("[{}] {} requested the shop".format(player_id, update.effective_user.first_name))
 
         return STATE_MAIN
 
@@ -432,6 +438,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
         player_id = update.effective_user.id
         player, _ = self.players_instance.get_or_create(player_id)
         if update_cooldown_and_notify(player_id, self.players_instance, context):
+            self.logger.error("[{}] {} is cooldown'd", player_id, update.effective_user.first_name)
             return
 
         choices = [
@@ -542,6 +549,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
                                             ACHIEVEMENTS_ID[item]["quantity{}".format(ach)]["id"]
                                         )
                                     except KeyError as e:
+                                        self.logger.warning("[{}] {}".format(player_id, str(e)))
                                         pass
                                     ach //= 10
                             if 10 <= stats[item]["total"]:
@@ -552,6 +560,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
                                             ACHIEVEMENTS_ID[item]["total{}".format(ach)]["id"]
                                         )
                                     except KeyError as e:
+                                        self.logger.warning("[{}] {}".format(player_id, str(e)))
                                         pass
                                     ach //= 10
 
@@ -665,7 +674,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
             try:
                 query.edit_message_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
             except BadRequest as e:  # Not edit to be done
-                print(str(e))
+                self.logger.warning("[{}] {}".format(player_id, str(e)))
                 pass
 
         return STATE_BUY_SELL
@@ -710,8 +719,6 @@ class PlayerInterfaceHandlers(BaseHandlers):
             stats = self.players_instance.get_stats(player_id)
             item = id_to_item_name(data[1])
             current_upgrades = set(self.players_instance.get_upgrades(player_id, item))
-
-            print("DATA", data)
 
             if data[2:]:
                 upgrade_id = int(data[2:])
@@ -775,7 +782,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
             try:
                 query.edit_message_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
             except BadRequest as e:  # Not edit to be done
-                print(str(e))
+                self.logger.warning("[{}] {}".format(player_id, str(e)))
                 pass
 
         return STATE_UPGRADES

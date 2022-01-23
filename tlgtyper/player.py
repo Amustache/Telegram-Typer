@@ -139,6 +139,7 @@ class Players:
             self.cache[player_id]["cooldown"]["retry_after"] = retry_after
         # Time protection
         except TimedOut as e:
+            self.logger.error(str(e))
             context.bot.send_message(
                 player_id,
                 "Oops\! I am currently experimenting network issues\. I'll try my best to get back to you as soon as possible\!",
@@ -146,6 +147,7 @@ class Players:
             )
         # Edit problem
         except BadRequest as e:
+            self.logger.error(str(e))
             if "Message to edit not found" in str(e):
                 context.bot.send_message(
                     player_id,
@@ -153,7 +155,6 @@ class Players:
                     parse_mode="MarkdownV2",
                 )
                 remove_job_if_exists(str(player_id), context)
-            self.logger.error(str(e))
 
     def update_achievements(
         self, player_id: int, context: CallbackContext

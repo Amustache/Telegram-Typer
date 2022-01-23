@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # pylint: disable=C0116,W0613
+import datetime
 import logging
 
 
@@ -14,10 +15,29 @@ from tlgtyper.jobs import start_all_jobs
 from tlgtyper.player import Players
 
 
-logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
+# logging
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+ch.setFormatter(formatter)
+
+fh = logging.FileHandler("./logs/log_{}.log".format(str(datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S"))))
+fh.setLevel(logging.INFO)
+fh.setFormatter(formatter)
+
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO,
+    handlers=[
+        ch,
+    ],
+)
 
 logger = logging.getLogger(__name__)
+logger.addHandler(fh)
 
+# Database
 Players = Players(logger)
 
 DB = SqliteDatabase(DB_PATH)
