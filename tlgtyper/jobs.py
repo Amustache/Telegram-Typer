@@ -77,6 +77,9 @@ def update_messages_and_contacts_from_job(context: CallbackContext) -> None:
         contacts_to_add = CAP
 
     if messages_to_add > 0 or contacts_to_add > 0:
+        if player.messages > CAP or player.messages_total > CAP or player.contacts > CAP or player.contacts_total > CAP:
+            return
+
         player.messages += TIME_INTERVAL * messages_to_add
         player.messages_total += TIME_INTERVAL * messages_to_add
         player.contacts += TIME_INTERVAL * contacts_to_add
