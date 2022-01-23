@@ -4,7 +4,7 @@ from tlgtyper.helpers import get_si
 HELP_COMMANDS = (
     "– Use /new to start a new game\n"
     "– Use /reset to reset a blocked counter.\n"
-    "– Use /interface to show the interface.\n"
+    "– Use /shop to show the shop.\n"
     "– Use /achievements to show your achievements.\n"
     "– Use /stats to get your stats.\n"
     "– Finally, use /end to stop the game and delete your account."
