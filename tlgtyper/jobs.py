@@ -86,7 +86,7 @@ def update_messages_and_contacts_from_job(context: CallbackContext) -> None:
         player.contacts_total += TIME_INTERVAL * contacts_to_add
         player.save()
 
-        if 10 <= player.messages:
+        if 10 <= player.messages <= 10_000_000:
             ach = power_10(player.messages)
             while ach >= 10:
                 try:
@@ -96,7 +96,7 @@ def update_messages_and_contacts_from_job(context: CallbackContext) -> None:
                 except KeyError as e:
                     pass
                 ach //= 10
-        if 10 <= player.messages_total:
+        if 10 <= player.messages_total <= 10_000_000:
             ach = power_10(player.messages_total)
             while ach >= 10:
                 try:
@@ -106,7 +106,7 @@ def update_messages_and_contacts_from_job(context: CallbackContext) -> None:
                 except KeyError as e:
                     pass
                 ach //= 10
-        if 10 <= player.contacts:
+        if 10 <= player.contacts <= 10_000_000:
             ach = power_10(player.contacts)
             while ach >= 10:
                 try:
@@ -116,7 +116,7 @@ def update_messages_and_contacts_from_job(context: CallbackContext) -> None:
                 except KeyError as e:
                     pass
                 ach //= 10
-        if 10 <= player.contacts_total:
+        if 10 <= player.contacts_total <= 10_000_000:
             ach = power_10(player.contacts_total)
             while ach >= 10:
                 try:

@@ -558,7 +558,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
                             player.save()
                             stats = self.players_instance.get_stats(player_id)
 
-                            if 10 <= stats[item]["quantity"]:
+                            if 10 <= stats[item]["quantity"] <= 10_000_000:
                                 ach = power_10(stats[item]["quantity"])
                                 while ach >= 10:
                                     try:
@@ -569,7 +569,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
                                         self.logger.warning("[{}] {}".format(player_id, str(e)))
                                         pass
                                     ach //= 10
-                            if 10 <= stats[item]["total"]:
+                            if 10 <= stats[item]["total"] <= 10_000_000:
                                 ach = power_10(stats[item]["total"])
                                 while ach >= 10:
                                     try:
