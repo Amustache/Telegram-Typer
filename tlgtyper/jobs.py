@@ -1,7 +1,7 @@
 from telegram.ext import CallbackContext
 
 
-from parameters import TIME_INTERVAL
+from parameters import CAP, TIME_INTERVAL
 from tlgtyper.achievements import ACHIEVEMENTS_ID
 from tlgtyper.helpers import power_10
 from tlgtyper.items import accumulate_upgrades
@@ -66,8 +66,15 @@ def update_messages_and_contacts_from_job(context: CallbackContext) -> None:
                 * stats[item]["quantity"]
             )
 
-    messages_to_add = int(messages_to_add)
-    contacts_to_add = int(contacts_to_add)
+    try:
+        messages_to_add = int(messages_to_add)
+    except OverflowError as e:
+        messages_to_add = CAP
+
+    try:
+        contacts_to_add = int(contacts_to_add)
+    except OverflowError as e:
+        contacts_to_add = CAP
 
     if messages_to_add > 0 or contacts_to_add > 0:
         player.messages += TIME_INTERVAL * messages_to_add
@@ -79,30 +86,42 @@ def update_messages_and_contacts_from_job(context: CallbackContext) -> None:
         if 10 <= player.messages:
             ach = power_10(player.messages)
             while ach >= 10:
-                players_instance.cache[player_id]["achievements"].append(
-                    ACHIEVEMENTS_ID["messages"]["quantity{}".format(ach)]["id"]
-                )
+                try:
+                    players_instance.cache[player_id]["achievements"].append(
+                        ACHIEVEMENTS_ID["messages"]["quantity{}".format(ach)]["id"]
+                    )
+                except KeyError as e:
+                    pass
                 ach //= 10
         if 10 <= player.messages_total:
             ach = power_10(player.messages_total)
             while ach >= 10:
-                players_instance.cache[player_id]["achievements"].append(
-                    ACHIEVEMENTS_ID["messages"]["total{}".format(ach)]["id"]
-                )
+                try:
+                    players_instance.cache[player_id]["achievements"].append(
+                        ACHIEVEMENTS_ID["messages"]["total{}".format(ach)]["id"]
+                    )
+                except KeyError as e:
+                    pass
                 ach //= 10
         if 10 <= player.contacts:
             ach = power_10(player.contacts)
             while ach >= 10:
-                players_instance.cache[player_id]["achievements"].append(
-                    ACHIEVEMENTS_ID["contacts"]["quantity{}".format(ach)]["id"]
-                )
+                try:
+                    players_instance.cache[player_id]["achievements"].append(
+                        ACHIEVEMENTS_ID["contacts"]["quantity{}".format(ach)]["id"]
+                    )
+                except KeyError as e:
+                    pass
                 ach //= 10
         if 10 <= player.contacts_total:
             ach = power_10(player.contacts_total)
             while ach >= 10:
-                players_instance.cache[player_id]["achievements"].append(
-                    ACHIEVEMENTS_ID["contacts"]["total{}".format(ach)]["id"]
-                )
+                try:
+                    players_instance.cache[player_id]["achievements"].append(
+                        ACHIEVEMENTS_ID["contacts"]["total{}".format(ach)]["id"]
+                    )
+                except KeyError as e:
+                    pass
                 ach //= 10
 
         players_instance.update(player_id, context)

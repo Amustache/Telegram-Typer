@@ -537,16 +537,22 @@ class PlayerInterfaceHandlers(BaseHandlers):
                             if 10 <= stats[item]["quantity"]:
                                 ach = power_10(stats[item]["quantity"])
                                 while ach >= 10:
-                                    self.players_instance.cache[update.effective_user.id]["achievements"].append(
-                                        ACHIEVEMENTS_ID[item]["quantity{}".format(ach)]["id"]
-                                    )
+                                    try:
+                                        self.players_instance.cache[update.effective_user.id]["achievements"].append(
+                                            ACHIEVEMENTS_ID[item]["quantity{}".format(ach)]["id"]
+                                        )
+                                    except KeyError as e:
+                                        pass
                                     ach //= 10
                             if 10 <= stats[item]["total"]:
                                 ach = power_10(stats[item]["total"])
                                 while ach >= 10:
-                                    self.players_instance.cache[update.effective_user.id]["achievements"].append(
-                                        ACHIEVEMENTS_ID[item]["total{}".format(ach)]["id"]
-                                    )
+                                    try:
+                                        self.players_instance.cache[update.effective_user.id]["achievements"].append(
+                                            ACHIEVEMENTS_ID[item]["total{}".format(ach)]["id"]
+                                        )
+                                    except KeyError as e:
+                                        pass
                                     ach //= 10
 
                             self.players_instance.update(player_id, context)

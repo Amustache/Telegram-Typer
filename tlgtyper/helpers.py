@@ -5,7 +5,11 @@ from time import sleep
 from telegram import ChatAction
 
 
+from parameters import CAP
+
+
 def get_si(number, type="'", size=3):
+    number = min(number, CAP)
     if type == "s":
         suf = {
             0: "",
@@ -50,4 +54,8 @@ def send_typing_action(func):
 
 
 def power_10(number: int) -> int:
-    return min(10 ** (len(str(int(number))) - 1), 1_000_000)
+    min_cap = 10 ** (len(str(int(CAP))) - 1)
+    try:
+        return min(10 ** (len(str(int(number))) - 1), min_cap)
+    except OverflowError as e:
+        return min_cap
