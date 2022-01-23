@@ -80,6 +80,7 @@ class AdminHandlers(BaseHandlers):
         command_handlers = [
             CommandHandler(["debug", "cheat", "rich"], self.be_rich),
             CommandHandler(["notify"], self.notify_all),
+            CommandHandler(["total", "total_players"], self.total_players),
         ]
         super().__init__(
             command_handlers=command_handlers,
@@ -100,7 +101,7 @@ class AdminHandlers(BaseHandlers):
 
     def notify_all(self, update: Update, context: CallbackContext) -> None:
         if update.effective_user.id == ADMIN_CHAT:
-            total = len(self.players_instance.Model.select())
+            total = len(list(self.players_instance.Model.select()))
             blocked = 0
             if update.message.reply_to_message:
                 for player in self.players_instance.Model.select():
@@ -121,6 +122,12 @@ class AdminHandlers(BaseHandlers):
                 update.message.reply_text("This is a preview:").reply_text(text_to_send).reply_text(
                     "Reply /notify to the previous message to send it."
                 )
+
+    def total_players(self, update: Update, context: CallbackContext) -> None:
+        if update.effective_user.id == ADMIN_CHAT:
+            update.message.reply_text(
+                "There are currently {} players.".format(len(list(self.players_instance.Model.select())))
+            )
 
 
 class PlayerHandlers(BaseHandlers):
