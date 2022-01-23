@@ -3,10 +3,10 @@ from peewee import BigIntegerField, CharField, FloatField, IntegerField, Model, 
 from tabulate import tabulate
 
 
-main_db = SqliteDatabase("./database.db")
+DB_PATH = "./db/database.db"
 
 
-class Players(Model):
+class Model(Model):
     # Self
     id = BigIntegerField(unique=True)
     first_name = CharField(null=True)
@@ -14,44 +14,52 @@ class Players(Model):
 
     # Stats
     messages = FloatField(default=0)
+    messages_state = IntegerField(default=1)  # bool; Unlocked by default
     messages_total = FloatField(default=0)
+    messages_upgrades = CharField(default="")  # "xx,yy"
 
     contacts = FloatField(default=0)
-    contacts_state = IntegerField(default=0)
+    contacts_state = IntegerField(default=0)  # bool
     contacts_total = FloatField(default=0)
+    contacts_upgrades = CharField(default="")  # "xx,yy"
 
     groups = FloatField(default=0)
-    groups_state = IntegerField(default=0)
+    groups_state = IntegerField(default=0)  # bool
     groups_total = FloatField(default=0)
+    groups_upgrades = CharField(default="")  # "xx,yy"
 
     channels = FloatField(default=0)
-    channels_state = IntegerField(default=0)
+    channels_state = IntegerField(default=0)  # bool
     channels_total = FloatField(default=0)
+    channels_upgrades = CharField(default="")  # "xx,yy"
 
     supergroups = FloatField(default=0)
-    supergroups_state = IntegerField(default=0)
+    supergroups_state = IntegerField(default=0)  # bool
     supergroups_total = FloatField(default=0)
+    supergroups_upgrades = CharField(default="")  # "xx,yy"
 
-    achievements = CharField(default="")
+    upgrades = IntegerField(default=0)  # bool
+    tools = IntegerField(default=0)  # bool
+    achievements = CharField(default="")  # "xx,yy"
 
-    class Meta:
-        database = main_db
 
-
-main_db.connect()
-main_db.create_tables([Players])
+DB = SqliteDatabase(DB_PATH)
+DB.bind([Model])
+DB.connect()
+DB.create_tables([Model])
 
 headers = (
-    str(Players.select())
+    str(Model.select())
     .split("SELECT ")[1]
-    .split(' FROM "players" AS "t1"')[0]
+    .split(' FROM "model" AS "t1"')[0]
     .replace('"t1".', "")
     .replace('"', "")
     .split(", ")
 )
 
 values = []
-for player in Players.select():
+
+for player in Model.select():
     inner = [eval("player.{}".format(header)) for header in headers]
     values.append(inner)
 
