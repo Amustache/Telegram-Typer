@@ -300,7 +300,7 @@ class PlayerHandlers(BaseHandlers):
                 for currency, quantity in attrs["gain"].items():
                     message += "– Add {} {} per second\.\n".format(
                         get_si(
-                            accumulate_upgrades(item, stats[item]["upgrades"], stats[item]["gain"]["messages"])
+                            accumulate_upgrades(item, stats[item]["upgrades"], stats[item]["gain"][currency])
                             * stats[item]["quantity"],
                             type="f",
                         ),
