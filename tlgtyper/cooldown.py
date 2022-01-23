@@ -6,6 +6,7 @@ def update_cooldown_and_notify(player_id: int, players_instance, context: Callba
     retry_after = players_instance.cache[player_id]["cooldown"]["retry_after"]
     if retry_after:
         if not players_instance.cache[player_id]["cooldown"]["informed"]:
+            players_instance.cache[player_id]["cooldown"]["informed"] = True
             context.bot.send_message(
                 player_id,
                 "Oops! I have been a bit spammy...\n"
@@ -18,7 +19,7 @@ def update_cooldown_and_notify(player_id: int, players_instance, context: Callba
         return False
 
 
-def set_cooldown(player_id: int, players_instance, COUNTER_LIMIT=100) -> None:
+def set_cooldown(player_id: int, players_instance, COUNTER_LIMIT=1000) -> None:
     if players_instance.cache[player_id]["cooldown"]["counter"] >= COUNTER_LIMIT:
         players_instance.cache[player_id]["cooldown"]["retry_after"] = 3
         players_instance.cache[player_id]["cooldown"]["counter"] = 0
