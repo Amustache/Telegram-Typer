@@ -100,11 +100,21 @@ class AdminHandlers(BaseHandlers):
 
     def notify_all(self, update: Update, context: CallbackContext) -> None:
         if update.effective_user.id == ADMIN_CHAT:
+            total = len(self.players_instance.Model.select())
+            blocked = 0
             if update.message.reply_to_message:
                 for player in self.players_instance.Model.select():
-                    context.bot.send_message(player.id, update.message.reply_to_message.text)
+                    try:
+                        context.bot.send_message(player.id, update.message.reply_to_message.text)
+                    except:
+                        blocked += 1
                 self.logger.info(
-                    "[{}] {} sent a global message.".format(update.effective_user.id, update.effective_user.first_name)
+                    "[{}] {} sent a global message to {} people ({} blocked).".format(
+                        update.effective_user.id, update.effective_user.first_name, total - blocked, blocked
+                    )
+                )
+                update.message.reply_text(
+                    "Sent to {} people out of {} ({} failed).".format(total - blocked, total, blocked)
                 )
             else:
                 text_to_send = "🗣 Message from admin 🗣\n{}".format(update.effective_message.text.split(" ", 1)[1])
