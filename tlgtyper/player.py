@@ -2,7 +2,7 @@ from collections import defaultdict
 
 
 from peewee import BigIntegerField, CharField, FloatField, IntegerField, Model
-from telegram.error import BadRequest, RetryAfter
+from telegram.error import BadRequest, RetryAfter, TimedOut
 from telegram.ext import CallbackContext
 
 
@@ -132,10 +132,18 @@ class Players:
 
         try:
             context.bot.edit_message_text(message, player_id, user.pinned_message)
+        # Spam protection
         except RetryAfter as e:
             self.logger.error(str(e))
             retry_after = int(str(e).split("in ")[1].split(".0")[0])
             self.cache[player_id]["cooldown"]["retry_after"] = retry_after
+        # Time protection
+        except TimedOut as e:
+            context.bot.send_message(
+                player_id,
+                "Oops\! I am currently experimenting network issues\. I'll try my best to get back to you as soon as possible\!",
+                parse_mode="MarkdownV2",
+            )
         # Edit problem
         except BadRequest as e:
             if "Message to edit not found" in str(e):

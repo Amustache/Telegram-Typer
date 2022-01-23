@@ -27,7 +27,7 @@ DB.create_tables([Players.Model])
 
 
 def main() -> None:
-    updater = Updater(BOT_TOKEN)
+    updater = Updater(BOT_TOKEN, request_kwargs={"read_timeout": 15, "connect_timeout": 15})
     dispatcher = updater.dispatcher
 
     # Commands

@@ -122,8 +122,6 @@ class PlayerHandlers(BaseHandlers):
             CommandHandler(["stop", "stop_game", "end", "end_game"], self.stop_bot),
             CommandHandler(["achievements", "achievement"], self.show_achievements),
             CommandHandler(["stats", "stat"], self.show_stats),
-            # CommandHandler(["interface", "buy", "sell", "join", "leave"], self.interface),
-            # CallbackQueryHandler(self.interface),
         ]
         super().__init__(
             command_handlers=command_handlers,
@@ -154,8 +152,12 @@ class PlayerHandlers(BaseHandlers):
 
             update.message.reply_text("❕ You're ready to play!")
 
-            update.message.reply_text("Simply send a plain message to the bot, and it will answer you – making your score go 📈.")
-            update.message.reply_text("Important: if you send too many messages at once, Telegram will kick you for at most 30 minutes, so, if you see that the bot is not answering anymore, take a break and go touch grass!")
+            update.message.reply_text(
+                "Simply send a plain message to the bot, and it will answer you – making your score go 📈."
+            )
+            update.message.reply_text(
+                "Important: if you send too many messages at once, Telegram will kick you for at most 30 minutes, so, if you see that the bot is not answering anymore, take a break and go touch grass!"
+            )
 
             update.message.reply_text(HELP_COMMANDS)
 
@@ -357,9 +359,10 @@ STATE_MAIN, STATE_BUY_SELL, STATE_UPGRADES, STATE_TOOLS = range(4)
 
 class PlayerInterfaceHandlers(BaseHandlers):
     def __init__(self, players_instance, logger=None, media_folder=None):
+        commands = ["shop", "interface", "upgrades", "menu", "buy", "sell", "join", "leave"]
         command_handlers = [
             ConversationHandler(
-                entry_points=[CommandHandler(["interface"], self.interface)],
+                entry_points=[CommandHandler(commands, self.interface)],
                 states={
                     STATE_MAIN: [
                         CallbackQueryHandler(self.buy_sell, pattern="^{}$".format(STATE_BUY_SELL)),
@@ -378,7 +381,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
                     ],
                     # STATE_TOOLS: [],
                 },
-                fallbacks=[CommandHandler(["interface"], self.interface)],
+                fallbacks=[CommandHandler(commands, self.interface)],
             ),
         ]
         super().__init__(
