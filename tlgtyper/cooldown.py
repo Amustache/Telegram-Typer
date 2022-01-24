@@ -1,10 +1,14 @@
 from telegram.ext import CallbackContext
 
 
+from tlgtyper.jobs import remove_job_if_exists, update_job
+
+
 def update_cooldown_and_notify(player_id: int, players_instance, context: CallbackContext) -> bool:
     set_cooldown(player_id, players_instance)
     retry_after = players_instance.cache[player_id]["cooldown"]["retry_after"]
     if retry_after:
+        remove_job_if_exists(str(player_id), context)
         if not players_instance.cache[player_id]["cooldown"]["informed"]:
             players_instance.cache[player_id]["cooldown"]["informed"] = True
             context.bot.send_message(
@@ -16,6 +20,9 @@ def update_cooldown_and_notify(player_id: int, players_instance, context: Callba
             )
         return True
     else:
+        if players_instance.cache[player_id]["cooldown"]["informed"]:
+            players_instance.cache[player_id]["cooldown"]["informed"] = False
+            update_job(player_id, context, players_instance)
         return False
 
 
