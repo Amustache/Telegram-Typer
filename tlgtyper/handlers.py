@@ -208,7 +208,7 @@ class PlayerHandlers(BaseHandlers):
         player_id = user.id
 
         if update_cooldown_and_notify(player_id, self.players_instance, context):
-            self.logger.error("[{}] {} is cooldown'd", player_id, user.first_name)
+            self.logger.error("[{}] {} is cooldown'd".format(player_id, user.first_name))
             return
 
         try:
@@ -417,7 +417,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
         player_id = update.effective_user.id
         player, _ = self.players_instance.get_or_create(player_id)
         if update_cooldown_and_notify(player_id, self.players_instance, context):
-            self.logger.error("[{}] {} is cooldown'd", player_id, update.effective_user.first_name)
+            self.logger.error("[{}] {} is cooldown'd".format(player_id, update.effective_user.first_name))
             return
 
         choices = [
@@ -455,7 +455,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
         player_id = update.effective_user.id
         player, _ = self.players_instance.get_or_create(player_id)
         if update_cooldown_and_notify(player_id, self.players_instance, context):
-            self.logger.error("[{}] {} is cooldown'd", player_id, update.effective_user.first_name)
+            self.logger.error("[{}] {} is cooldown'd".format(player_id, update.effective_user.first_name))
             return
 
         choices = [
