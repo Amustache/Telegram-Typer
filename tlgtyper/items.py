@@ -17,7 +17,7 @@ ITEMS = {
         "symbol": "📇",
         "unlock_at": {"messages": 10},
         "base_price": {"messages": 10},
-        "gain": {"messages": 0.02, "contacts": 0.00001},
+        "gain": {"messages": 0.02, "contacts": 0},
     },
     "groups": {
         "id": "g",
