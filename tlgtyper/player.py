@@ -25,29 +25,29 @@ class Players:
         pinned_message = BigIntegerField(null=True)
 
         # Stats
-        messages = BigIntegerField(default=0)
+        messages = CharField(default="0")
         messages_state = IntegerField(default=1)  # bool; Unlocked by default
-        messages_total = BigIntegerField(default=0)
+        messages_total = CharField(default="0")
         messages_upgrades = CharField(default="")  # "xx,yy"
 
-        contacts = BigIntegerField(default=0)
+        contacts = CharField(default="0")
         contacts_state = IntegerField(default=0)  # bool
-        contacts_total = BigIntegerField(default=0)
+        contacts_total = CharField(default="0")
         contacts_upgrades = CharField(default="")  # "xx,yy"
 
-        groups = BigIntegerField(default=0)
+        groups = CharField(default="0")
         groups_state = IntegerField(default=0)  # bool
-        groups_total = BigIntegerField(default=0)
+        groups_total = CharField(default="0")
         groups_upgrades = CharField(default="")  # "xx,yy"
 
-        channels = BigIntegerField(default=0)
+        channels = CharField(default="0")
         channels_state = IntegerField(default=0)  # bool
-        channels_total = BigIntegerField(default=0)
+        channels_total = CharField(default="0")
         channels_upgrades = CharField(default="")  # "xx,yy"
 
-        supergroups = BigIntegerField(default=0)
+        supergroups = CharField(default="0")
         supergroups_state = IntegerField(default=0)  # bool
-        supergroups_total = BigIntegerField(default=0)
+        supergroups_total = CharField(default="0")
         supergroups_upgrades = CharField(default="")  # "xx,yy"
 
         upgrades = IntegerField(default=0)  # bool
