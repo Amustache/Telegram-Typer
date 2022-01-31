@@ -365,7 +365,15 @@ class PlayerHandlers(BaseHandlers):
         self.logger.info("[{}] {} requested stats".format(player_id, update.effective_user.first_name))
 
 
-STATE_ACHIEVEMENTS, STATE_CATALOG, STATE_SPECIFIC = range(3)
+(
+    STATE_ACHIEVEMENTS_MAIN,
+    STATE_ACHIEVEMENTS_CATALOG,
+    STATE_ACHIEVEMENTS_SPECIFIC,
+    STATE_INTERFACE_MAIN,
+    STATE_INTERFACE_BUY_SELL,
+    STATE_INTERFACE_UPGRADES,
+    STATE_INTERFACE_TOOLS,
+) = range(7)
 
 
 class PlayerAchievementsHandlers(BaseHandlers):
@@ -375,16 +383,22 @@ class PlayerAchievementsHandlers(BaseHandlers):
             ConversationHandler(
                 entry_points=[CommandHandler(commands, self.achievements)],
                 states={
-                    STATE_ACHIEVEMENTS: [
-                        CallbackQueryHandler(self.achievements_catalog, pattern="^{}$".format(STATE_CATALOG)),
+                    STATE_ACHIEVEMENTS_MAIN: [
+                        CallbackQueryHandler(
+                            self.achievements_catalog, pattern="^{}$".format(STATE_ACHIEVEMENTS_CATALOG)
+                        ),
                     ],
-                    STATE_CATALOG: [
-                        CallbackQueryHandler(self.achievements_catalog, pattern="^{}_?[0-9]*$".format(STATE_CATALOG)),
+                    STATE_ACHIEVEMENTS_CATALOG: [
+                        CallbackQueryHandler(
+                            self.achievements_catalog, pattern="^{}_?[0-9]*$".format(STATE_ACHIEVEMENTS_CATALOG)
+                        ),
                         # CallbackQueryHandler(self.achievements_specific, pattern="^{}_[0-9]*$".format(STATE_SPECIFIC)),
-                        CallbackQueryHandler(self.achievements_again, pattern="^{}$".format(STATE_ACHIEVEMENTS)),
+                        CallbackQueryHandler(self.achievements_again, pattern="^{}$".format(STATE_ACHIEVEMENTS_MAIN)),
                     ],
-                    STATE_SPECIFIC: [
-                        CallbackQueryHandler(self.achievements_catalog, pattern="^{}$".format(STATE_CATALOG)),
+                    STATE_ACHIEVEMENTS_SPECIFIC: [
+                        CallbackQueryHandler(
+                            self.achievements_catalog, pattern="^{}$".format(STATE_ACHIEVEMENTS_CATALOG)
+                        ),
                     ],
                 },
                 fallbacks=[CommandHandler(commands, self.achievements)],
@@ -416,7 +430,7 @@ class PlayerAchievementsHandlers(BaseHandlers):
         reply_markup = InlineKeyboardMarkup(
             [
                 [
-                    InlineKeyboardButton("Catalog View", callback_data=str(STATE_CATALOG)),
+                    InlineKeyboardButton("Catalog View", callback_data=str(STATE_ACHIEVEMENTS_CATALOG)),
                 ]
             ]
         )
@@ -425,7 +439,7 @@ class PlayerAchievementsHandlers(BaseHandlers):
 
         self.logger.info("[{}] {} requested achievements".format(player_id, update.effective_user.first_name))
 
-        return STATE_ACHIEVEMENTS
+        return STATE_ACHIEVEMENTS_MAIN
 
     def achievements_again(self, update: Update, context: CallbackContext) -> int:
         player_id = update.effective_user.id
@@ -446,7 +460,7 @@ class PlayerAchievementsHandlers(BaseHandlers):
         reply_markup = InlineKeyboardMarkup(
             [
                 [
-                    InlineKeyboardButton("Catalog View", callback_data=str(STATE_CATALOG)),
+                    InlineKeyboardButton("Catalog View", callback_data=str(STATE_ACHIEVEMENTS_CATALOG)),
                 ]
             ]
         )
@@ -455,7 +469,7 @@ class PlayerAchievementsHandlers(BaseHandlers):
         query.answer()
         update.callback_query.edit_message_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
 
-        return STATE_ACHIEVEMENTS
+        return STATE_ACHIEVEMENTS_MAIN
 
     def achievements_catalog(self, update: Update, context: CallbackContext) -> int:
         player_id = update.effective_user.id
@@ -486,18 +500,20 @@ class PlayerAchievementsHandlers(BaseHandlers):
         page_buttons = []
         if page > 0:
             page_buttons.append(
-                InlineKeyboardButton("Previous Page", callback_data="{}_{}".format(STATE_CATALOG, page - 1)),
+                InlineKeyboardButton(
+                    "Previous Page", callback_data="{}_{}".format(STATE_ACHIEVEMENTS_CATALOG, page - 1)
+                ),
             )
         if page < total_pages:
             page_buttons.append(
-                InlineKeyboardButton("Next Page", callback_data="{}_{}".format(STATE_CATALOG, page + 1)),
+                InlineKeyboardButton("Next Page", callback_data="{}_{}".format(STATE_ACHIEVEMENTS_CATALOG, page + 1)),
             )
 
         reply_markup = InlineKeyboardMarkup(
             [
                 page_buttons,
                 [
-                    InlineKeyboardButton("Global View", callback_data=str(STATE_ACHIEVEMENTS)),
+                    InlineKeyboardButton("Global View", callback_data=str(STATE_ACHIEVEMENTS_MAIN)),
                 ],
             ]
         )
@@ -508,10 +524,7 @@ class PlayerAchievementsHandlers(BaseHandlers):
             self.logger.warning("[{}] {}".format(player_id, str(e)))
             pass
 
-        return STATE_CATALOG
-
-
-STATE_MAIN, STATE_BUY_SELL, STATE_UPGRADES, STATE_TOOLS = range(4)
+        return STATE_ACHIEVEMENTS_CATALOG
 
 
 class PlayerInterfaceHandlers(BaseHandlers):
@@ -521,20 +534,22 @@ class PlayerInterfaceHandlers(BaseHandlers):
             ConversationHandler(
                 entry_points=[CommandHandler(commands, self.interface)],
                 states={
-                    STATE_MAIN: [
-                        CallbackQueryHandler(self.buy_sell, pattern="^{}$".format(STATE_BUY_SELL)),
-                        CallbackQueryHandler(self.upgrades, pattern="^{}$".format(STATE_UPGRADES)),
+                    STATE_INTERFACE_MAIN: [
+                        CallbackQueryHandler(self.buy_sell, pattern="^{}$".format(STATE_INTERFACE_BUY_SELL)),
+                        CallbackQueryHandler(self.upgrades, pattern="^{}$".format(STATE_INTERFACE_UPGRADES)),
                         # CallbackQueryHandler(self.tools, pattern="^{}$".format(STATE_TOOLS)),
                     ],
-                    STATE_BUY_SELL: [
+                    STATE_INTERFACE_BUY_SELL: [
                         CallbackQueryHandler(
-                            self.buy_sell, pattern="^{}[a-z]?[x|b|s]?(1|10|max)?$".format(STATE_BUY_SELL)
+                            self.buy_sell, pattern="^{}[a-z]?[x|b|s]?(1|10|max)?$".format(STATE_INTERFACE_BUY_SELL)
                         ),
-                        CallbackQueryHandler(self.interface_again, pattern="^{}$".format(STATE_MAIN)),
+                        CallbackQueryHandler(self.interface_again, pattern="^{}$".format(STATE_INTERFACE_MAIN)),
                     ],
-                    STATE_UPGRADES: [
-                        CallbackQueryHandler(self.upgrades, pattern="^{}[a-z]?[0-9]*$".format(STATE_UPGRADES)),
-                        CallbackQueryHandler(self.interface_again, pattern="^{}$".format(STATE_MAIN)),
+                    STATE_INTERFACE_UPGRADES: [
+                        CallbackQueryHandler(
+                            self.upgrades, pattern="^{}[a-z]?[0-9]*$".format(STATE_INTERFACE_UPGRADES)
+                        ),
+                        CallbackQueryHandler(self.interface_again, pattern="^{}$".format(STATE_INTERFACE_MAIN)),
                     ],
                     # STATE_TOOLS: [],
                 },
@@ -560,19 +575,19 @@ class PlayerInterfaceHandlers(BaseHandlers):
 
         choices = [
             [
-                InlineKeyboardButton("📈 Get/Forfeit 📉", callback_data=str(STATE_BUY_SELL)),
+                InlineKeyboardButton("📈 Get/Forfeit 📉", callback_data=str(STATE_INTERFACE_BUY_SELL)),
             ]
         ]
         if player.upgrades:
             choices.append(
                 [
-                    InlineKeyboardButton("🆙 Upgrades 🆙", callback_data=str(STATE_UPGRADES)),
+                    InlineKeyboardButton("🆙 Upgrades 🆙", callback_data=str(STATE_INTERFACE_UPGRADES)),
                 ]
             )
         if player.tools:
             choices.append(
                 [
-                    InlineKeyboardButton("🛠 Tools 🛠", callback_data=str(STATE_TOOLS)),
+                    InlineKeyboardButton("🛠 Tools 🛠", callback_data=str(STATE_INTERFACE_TOOLS)),
                 ]
             )
         reply_markup = InlineKeyboardMarkup(choices)
@@ -587,7 +602,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
 
         self.logger.info("[{}] {} requested the shop".format(player_id, update.effective_user.first_name))
 
-        return STATE_MAIN
+        return STATE_INTERFACE_MAIN
 
     def interface_again(self, update: Update, context: CallbackContext):
         player_id = update.effective_user.id
@@ -601,19 +616,19 @@ class PlayerInterfaceHandlers(BaseHandlers):
 
         choices = [
             [
-                InlineKeyboardButton("📈 Get/Forfeit 📉", callback_data=str(STATE_BUY_SELL)),
+                InlineKeyboardButton("📈 Get/Forfeit 📉", callback_data=str(STATE_INTERFACE_BUY_SELL)),
             ]
         ]
         if player.upgrades:
             choices.append(
                 [
-                    InlineKeyboardButton("🆙 Upgrades 🆙", callback_data=str(STATE_UPGRADES)),
+                    InlineKeyboardButton("🆙 Upgrades 🆙", callback_data=str(STATE_INTERFACE_UPGRADES)),
                 ]
             )
         if player.tools:
             choices.append(
                 [
-                    InlineKeyboardButton("🛠 Tools 🛠", callback_data=str(STATE_TOOLS)),
+                    InlineKeyboardButton("🛠 Tools 🛠", callback_data=str(STATE_INTERFACE_TOOLS)),
                 ]
             )
         reply_markup = InlineKeyboardMarkup(choices)
@@ -628,7 +643,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
         query.answer()
         update.callback_query.edit_message_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
 
-        return STATE_MAIN
+        return STATE_INTERFACE_MAIN
 
     def buy_sell(self, update: Update, context: CallbackContext):
         player_id = update.effective_user.id
@@ -637,7 +652,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
         data = query.data
 
         # Main
-        if data == str(STATE_BUY_SELL):
+        if data == str(STATE_INTERFACE_BUY_SELL):
             stats = self.players_instance.get_stats(player_id)
             choices = []
             for item, attrs in stats.items():  # e.g., "contacts": {"unlock_at", ...}
@@ -645,7 +660,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
                     choices.append(
                         InlineKeyboardButton(
                             "{} {}".format(stats[item]["symbol"], item.capitalize()),
-                            callback_data="{}{}x".format(STATE_BUY_SELL, stats[item]["id"]),
+                            callback_data="{}{}x".format(STATE_INTERFACE_BUY_SELL, stats[item]["id"]),
                         )
                     )
 
@@ -657,7 +672,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
             else:
                 message = "You don't have enough messages for now\.\.\."
 
-            choices.append([InlineKeyboardButton("↩️ Back", callback_data=str(STATE_MAIN))])
+            choices.append([InlineKeyboardButton("↩️ Back", callback_data=str(STATE_INTERFACE_MAIN))])
             reply_markup = InlineKeyboardMarkup(choices)
 
             update.callback_query.edit_message_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
@@ -761,29 +776,33 @@ class PlayerInterfaceHandlers(BaseHandlers):
                             buy.append(
                                 InlineKeyboardButton(
                                     "Get 1 {}".format(item[:-1]),
-                                    callback_data="{}{}b1".format(STATE_BUY_SELL, attrs["id"]),
+                                    callback_data="{}{}b1".format(STATE_INTERFACE_BUY_SELL, attrs["id"]),
                                 )
                             )
                             if can_buy >= 10:
                                 buy.append(
                                     InlineKeyboardButton(
                                         "Get 10 {}".format(item),
-                                        callback_data="{}{}b10".format(STATE_BUY_SELL, attrs["id"]),
+                                        callback_data="{}{}b10".format(STATE_INTERFACE_BUY_SELL, attrs["id"]),
                                     )
                                 )
                             else:
                                 buy.append(
-                                    InlineKeyboardButton(" ", callback_data="{}{}x".format(STATE_BUY_SELL, attrs["id"]))
+                                    InlineKeyboardButton(
+                                        " ", callback_data="{}{}x".format(STATE_INTERFACE_BUY_SELL, attrs["id"])
+                                    )
                                 )
                             buy.append(
                                 InlineKeyboardButton(
                                     "Get max {}".format(item),
-                                    callback_data="{}{}bmax".format(STATE_BUY_SELL, attrs["id"]),
+                                    callback_data="{}{}bmax".format(STATE_INTERFACE_BUY_SELL, attrs["id"]),
                                 )
                             )
                         else:
                             buy = [
-                                InlineKeyboardButton("", callback_data="{}{}x".format(STATE_BUY_SELL, attrs["id"]))
+                                InlineKeyboardButton(
+                                    "", callback_data="{}{}x".format(STATE_INTERFACE_BUY_SELL, attrs["id"])
+                                )
                             ] * 3
 
                         ## Sell
@@ -792,36 +811,40 @@ class PlayerInterfaceHandlers(BaseHandlers):
                             sell.append(
                                 InlineKeyboardButton(
                                     "Forfeit 1 {}".format(item[:-1]),
-                                    callback_data="{}{}s1".format(STATE_BUY_SELL, attrs["id"]),
+                                    callback_data="{}{}s1".format(STATE_INTERFACE_BUY_SELL, attrs["id"]),
                                 )
                             )
                             if stats[item]["quantity"] >= 10:
                                 sell.append(
                                     InlineKeyboardButton(
                                         "Forfeit 10 {}".format(item),
-                                        callback_data="{}{}s10".format(STATE_BUY_SELL, attrs["id"]),
+                                        callback_data="{}{}s10".format(STATE_INTERFACE_BUY_SELL, attrs["id"]),
                                     )
                                 )
                             else:
                                 sell.append(
-                                    InlineKeyboardButton("", callback_data="{}{}x".format(STATE_BUY_SELL, attrs["id"]))
+                                    InlineKeyboardButton(
+                                        "", callback_data="{}{}x".format(STATE_INTERFACE_BUY_SELL, attrs["id"])
+                                    )
                                 )
                             sell.append(
                                 InlineKeyboardButton(
                                     "Forfeit all {}".format(item),
-                                    callback_data="{}{}smax".format(STATE_BUY_SELL, attrs["id"]),
+                                    callback_data="{}{}smax".format(STATE_INTERFACE_BUY_SELL, attrs["id"]),
                                 )
                             )
                         else:
                             sell = [
-                                InlineKeyboardButton("", callback_data="{}{}x".format(STATE_BUY_SELL, attrs["id"]))
+                                InlineKeyboardButton(
+                                    "", callback_data="{}{}x".format(STATE_INTERFACE_BUY_SELL, attrs["id"])
+                                )
                             ] * 3
 
                         ## We found the correct one
                         break
 
             buttons = list(map(list, zip(*[buy, sell])))
-            buttons.append([InlineKeyboardButton("↩️ Back", callback_data="{}".format(STATE_BUY_SELL))])
+            buttons.append([InlineKeyboardButton("↩️ Back", callback_data="{}".format(STATE_INTERFACE_BUY_SELL))])
 
             reply_markup = InlineKeyboardMarkup(buttons)
             try:
@@ -830,7 +853,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
                 self.logger.warning("[{}] {}".format(player_id, str(e)))
                 pass
 
-        return STATE_BUY_SELL
+        return STATE_INTERFACE_BUY_SELL
 
     def upgrades(self, update: Update, context: CallbackContext):
         player_id = update.effective_user.id
@@ -839,7 +862,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
         data = query.data
 
         # Main
-        if data == str(STATE_UPGRADES):
+        if data == str(STATE_INTERFACE_UPGRADES):
             stats = self.players_instance.get_stats(player_id)
             choices = []
             for item, upgrades in UPGRADES.items():
@@ -847,7 +870,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
                     choices.append(
                         InlineKeyboardButton(
                             "{} {}".format(stats[item]["symbol"], item.capitalize()),
-                            callback_data="{}{}".format(STATE_UPGRADES, stats[item]["id"]),
+                            callback_data="{}{}".format(STATE_INTERFACE_UPGRADES, stats[item]["id"]),
                         )
                     )
 
@@ -861,7 +884,7 @@ class PlayerInterfaceHandlers(BaseHandlers):
             else:
                 message = "You cannot upgrade anything for now\.\.\."
 
-            choices.append([InlineKeyboardButton("↩️ Back", callback_data=str(STATE_MAIN))])
+            choices.append([InlineKeyboardButton("↩️ Back", callback_data=str(STATE_INTERFACE_MAIN))])
             reply_markup = InlineKeyboardMarkup(choices)
 
             update.callback_query.edit_message_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
@@ -934,12 +957,12 @@ class PlayerInterfaceHandlers(BaseHandlers):
 
             buttons = [
                 InlineKeyboardButton(
-                    upgrade_id, callback_data="{}{}{}".format(STATE_UPGRADES, stats[item]["id"], upgrade_id)
+                    upgrade_id, callback_data="{}{}{}".format(STATE_INTERFACE_UPGRADES, stats[item]["id"], upgrade_id)
                 )
                 for upgrade_id in available_upgrades
             ]
             buttons = [buttons[i : i + 4] for i in range(0, len(buttons), 4)]
-            buttons.append([InlineKeyboardButton("↩️ Back", callback_data="{}".format(STATE_UPGRADES))])
+            buttons.append([InlineKeyboardButton("↩️ Back", callback_data="{}".format(STATE_INTERFACE_UPGRADES))])
 
             reply_markup = InlineKeyboardMarkup(buttons)
             try:
@@ -948,4 +971,4 @@ class PlayerInterfaceHandlers(BaseHandlers):
                 self.logger.warning("[{}] {}".format(player_id, str(e)))
                 pass
 
-        return STATE_UPGRADES
+        return STATE_INTERFACE_UPGRADES
