@@ -19,7 +19,7 @@ from tlgtyper.cooldown import update_cooldown_and_notify
 from tlgtyper.helpers import get_si, power_10
 from tlgtyper.items import accumulate_upgrades, get_max_to_buy, get_price_for_n, id_to_item_name, ITEMS, UPGRADES
 from tlgtyper.jobs import remove_job_if_exists, update_job
-from tlgtyper.texts import BLABLA_TEXT, get_quantities, HELP_COMMANDS
+from tlgtyper.texts import BLABLA_TEXT, get_quantities, HELP_COMMANDS, SUFFIXES_MEANING
 
 
 class BaseHandlers:
@@ -255,7 +255,7 @@ class PlayerHandlers(BaseHandlers):
 
     def help_commands(self, update: Update, context: CallbackContext) -> None:
         user = update.effective_user
-        update.message.reply_text(HELP_COMMANDS)  # TODO
+        update.message.reply_text(HELP_COMMANDS).reply_text(SUFFIXES_MEANING)
         self.logger.info("[{}] {} requested help".format(user.id, user.first_name))
 
     def quickmode(self, update: Update, context: CallbackContext) -> None:

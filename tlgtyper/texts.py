@@ -10,6 +10,22 @@ HELP_COMMANDS = (
     "– Finally, use /end to stop the game and delete your account."
 )
 
+SUFFIXES_MEANING = (
+    "Suffixes:\n"
+    "– 1 k = One thousand\n"
+    "– 1 M = One million\n"
+    "– 1 G = One milliard\n"
+    "– 1 T = One billion\n"
+    "– 1 P = One billiard\n"
+    "– 1 E = One trillion\n"
+    "– 1 Z = One trilliard\n"
+    "– 1 Y = One quadrillion\n"
+    "... And then it gets weird..."
+    "– 1 AA = 10²⁷\n"
+    "– 1 AAA = 10¹⁰²\n"
+    "– 1 AAAA = 10¹⁸⁰\n"
+)
+
 BLABLA_TEXT = [
     "Something",
     "Whatsoever",

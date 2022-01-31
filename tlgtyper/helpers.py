@@ -25,13 +25,11 @@ def get_si(number: float, type="s", size=3):
         while number // 10 ** (exp * size):
             exp += 1
         exp -= 1 if exp else 0
-
         if exp <= len(sufs) - 1:
             suf = sufs[exp]
         else:
             exp_temp = exp - (len(sufs) - 1)
-            suf = " {}{}".format("A" * (exp_temp // 26), chr(65 + exp_temp % 26))
-
+            suf = " {}{}".format("A" * (1 + exp_temp // 26), chr(65 + exp_temp % 26))
         return "{:.2f}{}".format(number / 10 ** (exp * size), suf).rstrip("0").rstrip(".").replace(".", "\.")
     elif type == "'":
         return "{:,}".format(int(number)).replace(",", "'")
