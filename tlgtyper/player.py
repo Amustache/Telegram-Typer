@@ -73,20 +73,18 @@ class Players:
         actual = int(eval("player.{}".format(item)))
         actual_total = int(eval("player.{}_total".format(item)))
 
+        # We cannot deduce negative quantities
         if quantity < 0:
-            # We cannot deduce negative quantities
             if actual < -quantity:
                 return False
+
+        # Caping
+        if actual + quantity > CAP:
+            exec("player.{} = str(CAP)".format(item))
+            exec("player.{}_total = str(CAP)".format(item))
         else:
-            # Caping
-            if actual + quantity > CAP:
-                exec("player.{} = str(CAP)".format(item))
-                exec("player.{}_total = str(CAP)".format(item))
-                return True
-
+            exec("player.{} = str(actual + quantity)".format(item))
             exec("player.{}_total = str(actual_total + quantity)".format(item))
-
-        exec("player.{} = str(actual + quantity)".format(item))
 
         player.save()
         return True
