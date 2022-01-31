@@ -79,6 +79,7 @@ class AdminHandlers(BaseHandlers):
     def __init__(self, players_instance, logger=None, media_folder=None):
         command_handlers = [
             CommandHandler(["debug", "cheat", "rich"], self.be_rich),
+            CommandHandler(["cap"], self.be_extra_rich),
             CommandHandler(["notify"], self.notify_all),
             CommandHandler(["total", "total_players"], self.total_players),
         ]
@@ -95,6 +96,13 @@ class AdminHandlers(BaseHandlers):
             self.players_instance.add_to_item(player_id, 10_000_000_000, "messages")
         update.message.reply_text("Sent 10'000'000'000 messages.")
         self.logger.info("[{}] {} cheated.".format(player_id, update.effective_user.first_name))
+
+    def be_extra_rich(self, update: Update, context: CallbackContext) -> None:
+        player_id = update.effective_user.id
+        if player_id == ADMIN_CHAT:
+            self.players_instance.add_to_item(player_id, CAP/100, "messages")
+        update.message.reply_text("Sent CAP messages.")
+        self.logger.info("[{}] {} extra cheated.".format(player_id, update.effective_user.first_name))
 
     def notify_all(self, update: Update, context: CallbackContext) -> None:
         if update.effective_user.id == ADMIN_CHAT:
