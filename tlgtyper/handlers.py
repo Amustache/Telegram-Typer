@@ -353,7 +353,7 @@ class PlayerHandlers(BaseHandlers):
                     raise ValueError("Wrong achievement number: {}.".format(value))
             except ValueError as e:
                 self.logger.warning("[{}] {}".format(player_id, str(e)))
-                update.message.reply_text("Usage: `/achievement` or `/achievement number`")
+                update.message.reply_text("Usage: `/achievement` or `/achievement number`", parse_mode="MarkdownV2")
                 return
 
             try:
