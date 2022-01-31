@@ -80,6 +80,7 @@ class Players:
 
         # Caping
         if actual + quantity > CAP:
+            self.cache[player_id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["cap"]["id"])
             exec("player.{} = str(CAP)".format(item))
             exec("player.{}_total = str(CAP)".format(item))
         else:
@@ -163,14 +164,14 @@ class Players:
     def update_pinned_message(
         self, player_id: int, context: CallbackContext
     ) -> None:  # TODO ugly and not in the correct place
-        user, _ = self.get_or_create(player_id)
+        player, _ = self.get_or_create(player_id)
         if update_cooldown_and_notify(player_id, self, context):
             return
 
         message = get_quantities(player_id, self)
 
         try:
-            context.bot.edit_message_text(message, player_id, user.pinned_message)
+            context.bot.edit_message_text(message, player_id, player.pinned_message)
         # Spam protection
         except RetryAfter as e:
             self.logger.error(str(e))

@@ -9,7 +9,6 @@ from parameters import CAP
 
 
 def get_si(number, type="'", size=3):
-    number = min(number, CAP)
     if type == "s":
         suf = {
             0: "",

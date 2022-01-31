@@ -14,6 +14,18 @@ ACHIEVEMENTS_ID = {
             "title": "Le Début de la Fin",
             "text": "You started a new game\.",
         },
+        "cap": {
+            "id": 0xFB,
+            "medal": MEDALS[2],
+            "title": "Stock market crash",
+            "text": "You can stop now\.\.\.",
+        },
+        "alpha": {
+            "id": 0xFC,
+            "medal": MEDALS[2],
+            "title": "A Special Place in my Heart",
+            "text": "Took part in the alpha\!",
+        },
         "upgrades": {
             "id": 0xFE,
             "medal": MEDALS[2],

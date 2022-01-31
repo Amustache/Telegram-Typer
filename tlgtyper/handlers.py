@@ -100,7 +100,7 @@ class AdminHandlers(BaseHandlers):
     def be_extra_rich(self, update: Update, context: CallbackContext) -> None:
         player_id = update.effective_user.id
         if player_id == ADMIN_CHAT:
-            self.players_instance.add_to_item(player_id, CAP/100, "messages")
+            self.players_instance.add_to_item(player_id, CAP / 100, "messages")
         update.message.reply_text("Sent CAP messages.")
         self.logger.info("[{}] {} extra cheated.".format(player_id, update.effective_user.first_name))
 
@@ -212,8 +212,9 @@ class PlayerHandlers(BaseHandlers):
         user = update.effective_user
         player_id = user.id
 
-        if update_cooldown_and_notify(player_id, self.players_instance, context):
-            self.logger.error("[{}] {} is cooldown'd".format(player_id, user.first_name))
+        retry_after = update_cooldown_and_notify(player_id, self.players_instance, context)
+        if retry_after:
+            self.logger.error("[{}] {} is cooldown'd ({}s)".format(player_id, user.first_name, retry_after))
             return
 
         try:
@@ -430,8 +431,11 @@ class PlayerInterfaceHandlers(BaseHandlers):
     def interface(self, update: Update, context: CallbackContext):
         player_id = update.effective_user.id
         player, _ = self.players_instance.get_or_create(player_id)
-        if update_cooldown_and_notify(player_id, self.players_instance, context):
-            self.logger.error("[{}] {} is cooldown'd".format(player_id, update.effective_user.first_name))
+        retry_after = update_cooldown_and_notify(player_id, self.players_instance, context)
+        if retry_after:
+            self.logger.error(
+                "[{}] {} is cooldown'd ({}s)".format(player_id, update.effective_user.first_name, retry_after)
+            )
             return
 
         choices = [
@@ -468,8 +472,11 @@ class PlayerInterfaceHandlers(BaseHandlers):
     def interface_again(self, update: Update, context: CallbackContext):
         player_id = update.effective_user.id
         player, _ = self.players_instance.get_or_create(player_id)
-        if update_cooldown_and_notify(player_id, self.players_instance, context):
-            self.logger.error("[{}] {} is cooldown'd".format(player_id, update.effective_user.first_name))
+        retry_after = update_cooldown_and_notify(player_id, self.players_instance, context)
+        if retry_after:
+            self.logger.error(
+                "[{}] {} is cooldown'd ({}s)".format(player_id, update.effective_user.first_name, retry_after)
+            )
             return
 
         choices = [
