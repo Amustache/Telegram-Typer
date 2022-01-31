@@ -196,6 +196,9 @@ class PlayerHandlers(BaseHandlers):
             "Send a text (not a command!) to the bot to see this message update.\n"
             "(If the pinned message does not update, please do /new_game again.)"
         )
+
+        self.players_instance.cache[player_id]["current_message"] = counter.text
+
         player.pinned_message = counter.message_id
         player.save()
 

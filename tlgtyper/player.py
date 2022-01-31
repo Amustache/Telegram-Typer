@@ -54,11 +54,13 @@ class Players:
         tools = IntegerField(default=0)  # bool
         achievements = CharField(default="")  # "xx,yy"
 
+    # Basically when something bores me, I put it in the cache, and it dirtily works.
     cache = defaultdict(
         lambda: {
             "from_chat": 0,
             "achievements": [],
             "cooldown": {"informed": False, "retry_after": 0, "counter": 0},
+            "current_message": "",
         }
     )
 
@@ -169,32 +171,33 @@ class Players:
             return
 
         message = get_quantities(player_id, self)
-
-        try:
-            context.bot.edit_message_text(message, player_id, player.pinned_message, parse_mode="MarkdownV2")
-        # Spam protection
-        except RetryAfter as e:
-            self.logger.error(str(e))
-            retry_after = int(str(e).split("in ")[1].split(".0")[0])
-            self.cache[player_id]["cooldown"]["retry_after"] = retry_after
-        # Timeout protection
-        except TimedOut as e:
-            self.logger.error(str(e))
-            context.bot.send_message(
-                player_id,
-                "Oops\! I am currently experimenting network issues\. I'll try my best to get back to you as soon as possible\!",
-                parse_mode="MarkdownV2",
-            )
-        # Edit problem
-        except BadRequest as e:
-            self.logger.error(str(e))
-            if "Message to edit not found" in str(e):
+        if message != self.cache[player_id]["current_message"]:
+            try:
+                context.bot.edit_message_text(message, player_id, player.pinned_message, parse_mode="MarkdownV2")
+                self.cache[player_id]["current_message"] = message
+            # Spam protection
+            except RetryAfter as e:
+                self.logger.error(str(e))
+                retry_after = int(str(e).split("in ")[1].split(".0")[0])
+                self.cache[player_id]["cooldown"]["retry_after"] = retry_after
+            # Timeout protection
+            except TimedOut as e:
+                self.logger.error(str(e))
                 context.bot.send_message(
                     player_id,
-                    "Oops\! It seems like I did not find the pinned message\. Could you use /reset, please\?",
+                    "Oops\! I am currently experimenting network issues\. I'll try my best to get back to you as soon as possible\!",
                     parse_mode="MarkdownV2",
                 )
-                remove_job_if_exists(str(player_id), context)
+            # Edit problem
+            except BadRequest as e:
+                self.logger.error(str(e))
+                if "Message to edit not found" in str(e):
+                    context.bot.send_message(
+                        player_id,
+                        "Oops\! It seems like I did not find the pinned message\. Could you use /reset, please\?",
+                        parse_mode="MarkdownV2",
+                    )
+                    remove_job_if_exists(str(player_id), context)
 
     def update_achievements(
         self, player_id: int, context: CallbackContext
