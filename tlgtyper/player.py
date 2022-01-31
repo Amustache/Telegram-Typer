@@ -171,7 +171,7 @@ class Players:
         message = get_quantities(player_id, self)
 
         try:
-            context.bot.edit_message_text(message, player_id, player.pinned_message)
+            context.bot.edit_message_text(message, player_id, player.pinned_message, parse_mode="MarkdownV2")
         # Spam protection
         except RetryAfter as e:
             self.logger.error(str(e))
