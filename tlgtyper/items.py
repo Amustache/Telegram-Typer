@@ -402,7 +402,7 @@ UPGRADES = {
 }
 
 
-def accumulate_upgrades(item: str, upgrades_ids: str, base_value: int) -> float:
+def accumulate_upgrades(item: str, upgrades_ids: str, base_value: float) -> float:
     if upgrades_ids:
         upgrades_ids = [int(upgrade_id) for upgrade_id in upgrades_ids.split(",") if upgrade_id]
         result = base_value

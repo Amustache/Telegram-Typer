@@ -92,10 +92,7 @@ class AdminHandlers(BaseHandlers):
     def be_rich(self, update: Update, context: CallbackContext) -> None:
         player_id = update.effective_user.id
         if player_id == ADMIN_CHAT:
-            player, _ = self.players_instance.get_or_create(player_id)
-            player.messages += 10_000_000_000
-            player.messages_total += 10_000_000_000
-            player.save()
+            self.players_instance.add_to_item(player_id, 10_000_000_000, "messages")
         update.message.reply_text("Sent 10'000'000'000 messages.")
         self.logger.info("[{}] {} cheated.".format(player_id, update.effective_user.first_name))
 
@@ -235,10 +232,8 @@ class PlayerHandlers(BaseHandlers):
 
                 for currency, price in base_prices.items():
                     loss = get_price_for_n(price, stats[item]["quantity"], qt)
-                    exec("player.{} -= loss".format(currency))
-                exec("player.{} += qt".format(item))
-                exec("player.{}_total += qt".format(item))
-                player.save()
+                    self.players_instance.sub_to_item(player_id, loss, currency)
+                self.players_instance.add_to_item(player_id, qt, item)
 
                 update.message.reply_text("[Quickmode] Got {} {}!".format(qt, item.capitalize()))
         except RetryAfter as e:
@@ -523,7 +518,6 @@ class PlayerInterfaceHandlers(BaseHandlers):
 
         # Choice has been made
         else:
-            player, _ = self.players_instance.get_or_create(player_id)
             stats = self.players_instance.get_stats(player_id)
 
             buy = []
@@ -552,10 +546,8 @@ class PlayerInterfaceHandlers(BaseHandlers):
                                     qt = min(qt, loss)
                             for currency, price in base_prices.items():
                                 loss = get_price_for_n(price, stats[item]["quantity"], qt)
-                                exec("player.{} -= loss".format(currency))
-                            exec("player.{} += qt".format(item))
-                            exec("player.{}_total += qt".format(item))
-                            player.save()
+                                self.players_instance.sub_to_item(player_id, loss, currency)
+                            self.players_instance.add_to_item(player_id, qt, item)
                             stats = self.players_instance.get_stats(player_id)
 
                             if 10 <= stats[item]["quantity"] <= 10_000_000:
@@ -593,10 +585,8 @@ class PlayerInterfaceHandlers(BaseHandlers):
                                 qt = stats[item]["quantity"]
                             for currency, price in sell_price.items():
                                 gain = get_price_for_n(price, stats[item]["quantity"], -qt)
-                                exec("player.{} += gain".format(currency))
-                                exec("player.{}_total += gain".format(currency))
-                            exec("player.{} -= qt".format(item))
-                            player.save()
+                                self.players_instance.add_to_item(player_id, gain, currency)
+                            self.players_instance.sub_to_item(player_id, qt, item)
                             stats = self.players_instance.get_stats(player_id)
 
                             self.players_instance.update(player_id, context)
@@ -733,17 +723,18 @@ class PlayerInterfaceHandlers(BaseHandlers):
         # Choice has been made
         else:
             player, _ = self.players_instance.get_or_create(player_id)
-            stats = self.players_instance.get_stats(player_id)
             item = id_to_item_name(data[1])
             current_upgrades = set(self.players_instance.get_upgrades(player_id, item))
 
             if data[2:]:
                 upgrade_id = int(data[2:])
                 for currency, quantity in UPGRADES[item][upgrade_id]["cost"].items():
-                    exec("player.{} -= quantity".format(currency))
+                    self.players_instance.sub_to_item(player_id, quantity, currency)
                 current_upgrades.add(upgrade_id)
                 exec('player.{}_upgrades = ", ".join([str(num) for num in current_upgrades if num])'.format(item))
                 player.save()
+
+            stats = self.players_instance.get_stats(player_id)
 
             message = "*🆙 Upgrades 🆙*\n\n"
             message += "*{} {}*\n\n".format(stats[item]["symbol"], item.capitalize())

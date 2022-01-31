@@ -1,11 +1,12 @@
 from collections import defaultdict
 
 
-from peewee import BigIntegerField, CharField, FloatField, IntegerField, Model
+from peewee import BigIntegerField, CharField, IntegerField, Model
 from telegram.error import BadRequest, RetryAfter, TimedOut
 from telegram.ext import CallbackContext
 
 
+from parameters import CAP
 from tlgtyper.achievements import ACHIEVEMENTS, ACHIEVEMENTS_ID
 from tlgtyper.cooldown import set_cooldown, update_cooldown_and_notify
 from tlgtyper.items import ITEMS
@@ -24,29 +25,29 @@ class Players:
         pinned_message = BigIntegerField(null=True)
 
         # Stats
-        messages = FloatField(default=0)
+        messages = BigIntegerField(default=0)
         messages_state = IntegerField(default=1)  # bool; Unlocked by default
-        messages_total = FloatField(default=0)
+        messages_total = BigIntegerField(default=0)
         messages_upgrades = CharField(default="")  # "xx,yy"
 
-        contacts = FloatField(default=0)
+        contacts = BigIntegerField(default=0)
         contacts_state = IntegerField(default=0)  # bool
-        contacts_total = FloatField(default=0)
+        contacts_total = BigIntegerField(default=0)
         contacts_upgrades = CharField(default="")  # "xx,yy"
 
-        groups = FloatField(default=0)
+        groups = BigIntegerField(default=0)
         groups_state = IntegerField(default=0)  # bool
-        groups_total = FloatField(default=0)
+        groups_total = BigIntegerField(default=0)
         groups_upgrades = CharField(default="")  # "xx,yy"
 
-        channels = FloatField(default=0)
+        channels = BigIntegerField(default=0)
         channels_state = IntegerField(default=0)  # bool
-        channels_total = FloatField(default=0)
+        channels_total = BigIntegerField(default=0)
         channels_upgrades = CharField(default="")  # "xx,yy"
 
-        supergroups = FloatField(default=0)
+        supergroups = BigIntegerField(default=0)
         supergroups_state = IntegerField(default=0)  # bool
-        supergroups_total = FloatField(default=0)
+        supergroups_total = BigIntegerField(default=0)
         supergroups_upgrades = CharField(default="")  # "xx,yy"
 
         upgrades = IntegerField(default=0)  # bool
@@ -64,6 +65,45 @@ class Players:
     def get_or_create(self, player_id):
         return self.Model.get_or_create(id=player_id)
 
+    def add_to_item(self, player_id: int, quantity: float, item: str) -> bool:
+        # Quantities are stored as STRING, and last two digits are floating.
+        quantity = int(quantity * 100)
+
+        player, _ = self.Model.get_or_create(id=player_id)
+        actual = int(eval("player.{}".format(item)))
+        actual_total = int(eval("player.{}_total".format(item)))
+
+        if quantity < 0:
+            # We cannot deduce negative quantities
+            if actual < -quantity:
+                return False
+        else:
+            # Caping
+            if actual + quantity > CAP:
+                exec("player.{} = str(CAP)".format(item))
+                exec("player.{}_total = str(CAP)".format(item))
+                return True
+
+            exec("player.{}_total = str(actual_total + quantity)".format(item))
+
+        exec("player.{} = str(actual + quantity)".format(item))
+
+        player.save()
+        return True
+
+    def sub_to_item(self, player_id: int, quantity: float, item: str) -> bool:
+        return self.add_to_item(player_id, -quantity, item)
+
+    def get_item(self, player_id: int, item: str) -> float:
+        player, _ = self.Model.get_or_create(id=player_id)
+        # Quantities are stored as STRING, and last two digits are floating.
+        return int(eval("player.{}".format(item))) / 100
+
+    def get_item_total(self, player_id: int, item: str) -> float:
+        player, _ = self.Model.get_or_create(id=player_id)
+        # Quantities are stored as STRING, and last two digits are floating.
+        return int(eval("player.{}_total".format(item))) / 100
+
     def get_stats(self, player_id):
         player, _ = self.get_or_create(player_id)
         scope = locals()
@@ -73,8 +113,9 @@ class Players:
                 **attrs,
                 **{
                     "unlocked": eval("player.{}_state".format(item), scope),
-                    "quantity": eval("player.{}".format(item), scope),
-                    "total": eval("player.{}_total".format(item), scope),
+                    # Quantities are stored as STRING, and last two digits are floating.
+                    "quantity": int(eval("player.{}".format(item), scope)) / 100,
+                    "total": int(eval("player.{}_total".format(item), scope)) / 100,
                     "upgrades": eval("player.{}_upgrades".format(item), scope),
                 },
             }

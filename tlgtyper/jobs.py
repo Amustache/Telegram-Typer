@@ -46,7 +46,6 @@ def start_all_jobs(dispatcher, players_instance) -> None:
 
 def update_messages_and_contacts_from_job(context: CallbackContext) -> None:
     player_id, players_instance = context.job.context
-    player, _ = players_instance.get_or_create(player_id)
     stats = players_instance.get_stats(player_id)
 
     messages_to_add = 0
@@ -76,18 +75,11 @@ def update_messages_and_contacts_from_job(context: CallbackContext) -> None:
     except OverflowError as e:
         contacts_to_add = CAP
 
-    if messages_to_add > 0 or contacts_to_add > 0:
-        if player.messages > CAP or player.messages_total > CAP or player.contacts > CAP or player.contacts_total > CAP:
-            return
+    if messages_to_add > 0:
+        players_instance.add_to_item(player_id, TIME_INTERVAL * messages_to_add, "messages")
 
-        player.messages += TIME_INTERVAL * messages_to_add
-        player.messages_total += TIME_INTERVAL * messages_to_add
-        player.contacts += TIME_INTERVAL * contacts_to_add
-        player.contacts_total += TIME_INTERVAL * contacts_to_add
-        player.save()
-
-        if 10 <= player.messages <= 10_000_000:
-            ach = power_10(player.messages)
+        if 10 <= players_instance.get_item(player_id, "messages") <= 10_000_000:
+            ach = power_10(players_instance.get_item(player_id, "messages"))
             while ach >= 10:
                 try:
                     players_instance.cache[player_id]["achievements"].append(
@@ -96,8 +88,8 @@ def update_messages_and_contacts_from_job(context: CallbackContext) -> None:
                 except KeyError as e:
                     pass
                 ach //= 10
-        if 10 <= player.messages_total <= 10_000_000:
-            ach = power_10(player.messages_total)
+        if 10 <= players_instance.get_item_total(player_id, "messages") <= 10_000_000:
+            ach = power_10(players_instance.get_item_total(player_id, "messages"))
             while ach >= 10:
                 try:
                     players_instance.cache[player_id]["achievements"].append(
@@ -106,8 +98,12 @@ def update_messages_and_contacts_from_job(context: CallbackContext) -> None:
                 except KeyError as e:
                     pass
                 ach //= 10
-        if 10 <= player.contacts <= 10_000_000:
-            ach = power_10(player.contacts)
+
+    if contacts_to_add > 0:
+        players_instance.add_to_item(player_id, TIME_INTERVAL * contacts_to_add, "contacts")
+
+        if 10 <= players_instance.get_item(player_id, "contacts") <= 10_000_000:
+            ach = power_10(players_instance.get_item(player_id, "contacts"))
             while ach >= 10:
                 try:
                     players_instance.cache[player_id]["achievements"].append(
@@ -116,8 +112,8 @@ def update_messages_and_contacts_from_job(context: CallbackContext) -> None:
                 except KeyError as e:
                     pass
                 ach //= 10
-        if 10 <= player.contacts_total <= 10_000_000:
-            ach = power_10(player.contacts_total)
+        if 10 <= players_instance.get_item_total(player_id, "contacts") <= 10_000_000:
+            ach = power_10(players_instance.get_item_total(player_id, "contacts"))
             while ach >= 10:
                 try:
                     players_instance.cache[player_id]["achievements"].append(
@@ -127,4 +123,5 @@ def update_messages_and_contacts_from_job(context: CallbackContext) -> None:
                     pass
                 ach //= 10
 
+    if messages_to_add > 0 or contacts_to_add > 0:
         players_instance.update(player_id, context)

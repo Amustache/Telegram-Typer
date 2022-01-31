@@ -13,29 +13,29 @@ class Model(Model):
     pinned_message = BigIntegerField(null=True)
 
     # Stats
-    messages = FloatField(default=0)
+    messages = BigIntegerField(default=0)
     messages_state = IntegerField(default=1)  # bool; Unlocked by default
-    messages_total = FloatField(default=0)
+    messages_total = BigIntegerField(default=0)
     messages_upgrades = CharField(default="")  # "xx,yy"
 
-    contacts = FloatField(default=0)
+    contacts = BigIntegerField(default=0)
     contacts_state = IntegerField(default=0)  # bool
-    contacts_total = FloatField(default=0)
+    contacts_total = BigIntegerField(default=0)
     contacts_upgrades = CharField(default="")  # "xx,yy"
 
-    groups = FloatField(default=0)
+    groups = BigIntegerField(default=0)
     groups_state = IntegerField(default=0)  # bool
-    groups_total = FloatField(default=0)
+    groups_total = BigIntegerField(default=0)
     groups_upgrades = CharField(default="")  # "xx,yy"
 
-    channels = FloatField(default=0)
+    channels = BigIntegerField(default=0)
     channels_state = IntegerField(default=0)  # bool
-    channels_total = FloatField(default=0)
+    channels_total = BigIntegerField(default=0)
     channels_upgrades = CharField(default="")  # "xx,yy"
 
-    supergroups = FloatField(default=0)
+    supergroups = BigIntegerField(default=0)
     supergroups_state = IntegerField(default=0)  # bool
-    supergroups_total = FloatField(default=0)
+    supergroups_total = BigIntegerField(default=0)
     supergroups_upgrades = CharField(default="")  # "xx,yy"
 
     upgrades = IntegerField(default=0)  # bool
