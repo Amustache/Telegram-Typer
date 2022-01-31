@@ -295,36 +295,44 @@ class PlayerHandlers(BaseHandlers):
                 if achievement_id in user_achievements
             ]
         )
-        message += "*Achievements*\n"
-        message += "– Unlocked {} achievements out of {}\.\n".format(sum(medals.values()), MAX_ACHIEVEMENTS)
-        message += "– {}\n".format(", ".join(["{} {}".format(qt, medal) for medal, qt in medals.items()]))
-        message += "\n"
+        if sum(medals.values()) > 0:
+            message += "*Achievements*\n"
+            message += "– Unlocked {} achievements out of {}\.\n".format(sum(medals.values()), MAX_ACHIEVEMENTS)
+            message += "– {}\n".format(", ".join(["{} {}".format(qt, medal) for medal, qt in medals.items()]))
+            message += "\n"
 
-        message += "*{}*\n".format("Messages")
-        message += "– {} current {}\.\n".format(get_si(stats["messages"]["quantity"]), "messages")
-        message += "– {} {} in total\.\n".format(get_si(stats["messages"]["total"]), "messages")
-        message += "– {} upgrades unlocked\.\n".format(len(self.players_instance.get_upgrades(player_id, "messages")))
-        message += "\n"
+        if int(stats["messages"]["quantity"]) > 0:
+            message += "*{}*\n".format("Messages")
+            message += "– {} current {}\.\n".format(get_si(stats["messages"]["quantity"]), "messages")
+            message += "– {} {} in total\.\n".format(get_si(stats["messages"]["total"]), "messages")
+            message += "– {} upgrades unlocked\.\n".format(
+                len(self.players_instance.get_upgrades(player_id, "messages"))
+            )
+            message += "\n"
 
         per_second = defaultdict(int)
         for item, attrs in stats.items():  # e.g., "contacts": {"unlock_at", ...}
             if "unlock_at" in attrs and stats[item]["unlocked"]:
-                message += "*{}*\n".format(item.capitalize())
-                message += "– {} current {}\.\n".format(get_si(attrs["quantity"]), item)
-                message += "– {} {} in total\.\n".format(get_si(attrs["total"]), item)
-                message += "– {} upgrades unlocked\.\n".format(len(self.players_instance.get_upgrades(player_id, item)))
-                for currency, quantity in attrs["gain"].items():
-                    currency_per_second = (
-                        accumulate_upgrades(item, stats[item]["upgrades"], stats[item]["gain"][currency])
-                        * stats[item]["quantity"]
+                if int(attrs["quantity"]) > 0:
+                    message += "*{}*\n".format(item.capitalize())
+                    message += "– {} current {}\.\n".format(get_si(attrs["quantity"]), item)
+                    message += "– {} {} in total\.\n".format(get_si(attrs["total"]), item)
+                    message += "– {} upgrades unlocked\.\n".format(
+                        len(self.players_instance.get_upgrades(player_id, item))
                     )
-                    per_second[currency] += currency_per_second
-                    message += "– Add {} {} per second\.\n".format(get_si(currency_per_second, type="f"), currency)
-                message += "\n"
+                    for currency, quantity in attrs["gain"].items():
+                        currency_per_second = (
+                            accumulate_upgrades(item, stats[item]["upgrades"], stats[item]["gain"][currency])
+                            * stats[item]["quantity"]
+                        )
+                        per_second[currency] += currency_per_second
+                        message += "– Add {} {} per second\.\n".format(get_si(currency_per_second, type="f"), currency)
+                    message += "\n"
 
-        message += "*Total*\n"
-        for currency, quantity in per_second.items():
-            message += "– Getting {} {} per second\.\n".format(get_si(quantity, type="f"), currency)
+        if sum(per_second.values()) > 0:
+            message += "*Total*\n"
+            for currency, quantity in per_second.items():
+                message += "– Getting {} {} per second\.\n".format(get_si(quantity, type="f"), currency)
 
         message += BOT_LINK
 
