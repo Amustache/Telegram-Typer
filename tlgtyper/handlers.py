@@ -157,7 +157,6 @@ class PlayerHandlers(BaseHandlers):
             CommandHandler(["help", "commands"], self.help_commands),
             CommandHandler(["quickmode", "quick", "quickmessage"], self.quickmode),
             CommandHandler(["stop", "stop_game", "end", "end_game"], self.stop_bot),
-            CommandHandler(["achievements", "achievement"], self.show_achievements),
             CommandHandler(["stats", "stat"], self.show_stats),
         ]
         super().__init__(
@@ -365,47 +364,151 @@ class PlayerHandlers(BaseHandlers):
         update.message.reply_text(message, parse_mode="MarkdownV2")
         self.logger.info("[{}] {} requested stats".format(player_id, update.effective_user.first_name))
 
-    def show_achievements(self, update: Update, context: CallbackContext) -> None:
-        user = update.effective_user
-        player_id = user.id
+
+STATE_ACHIEVEMENTS, STATE_CATALOG, STATE_SPECIFIC = range(3)
+
+
+class PlayerAchievementsHandlers(BaseHandlers):
+    def __init__(self, players_instance, logger=None, media_folder=None):
+        commands = ["achievements", "achievement"]
+        command_handlers = [
+            ConversationHandler(
+                entry_points=[CommandHandler(commands, self.achievements)],
+                states={
+                    STATE_ACHIEVEMENTS: [
+                        CallbackQueryHandler(self.achievements_catalog, pattern="^{}$".format(STATE_CATALOG)),
+                    ],
+                    STATE_CATALOG: [
+                        CallbackQueryHandler(self.achievements_catalog, pattern="^{}_?[0-9]*$".format(STATE_CATALOG)),
+                        # CallbackQueryHandler(self.achievements_specific, pattern="^{}_[0-9]*$".format(STATE_SPECIFIC)),
+                        CallbackQueryHandler(self.achievements_again, pattern="^{}$".format(STATE_ACHIEVEMENTS)),
+                    ],
+                    STATE_SPECIFIC: [
+                        CallbackQueryHandler(self.achievements_catalog, pattern="^{}$".format(STATE_CATALOG)),
+                    ],
+                },
+                fallbacks=[CommandHandler(commands, self.achievements)],
+            )
+        ]
+        super().__init__(
+            command_handlers=command_handlers,
+            players_instance=players_instance,
+            logger=logger,
+            media_folder=media_folder,
+        )
+
+    def achievements(self, update: Update, context: CallbackContext) -> int:
+        player_id = update.effective_user.id
 
         user_achievements = self.players_instance.get_achievements(player_id)
         question = "❔"
 
-        if context.args:
-            try:
-                value = int(context.args[0], 16)
-                if value < 0 or value > 0xFF:
-                    raise ValueError("Wrong achievement number: {}.".format(value))
-            except ValueError as e:
-                self.logger.warning("[{}] {}".format(player_id, str(e)))
-                update.message.reply_text("Usage: `/achievement` or `/achievement number`", parse_mode="MarkdownV2")
-                return
+        things = [
+            "{:02X}: {}".format(id, medal if id in user_achievements else question)
+            for id, (medal, _, _) in sorted(ACHIEVEMENTS.items())
+        ]
+        things = [things[i : i + 5] for i in range(0, len(things), 5)]
+        message = "*🌟 Achievements 🌟*\n_Unlocked {} achievements out of {}_\n\n".format(
+            len(user_achievements), len(ACHIEVEMENTS.items())
+        )
+        message += "\n".join([", ".join(text) for text in things])
 
-            try:
-                medal, title, text = ACHIEVEMENTS[value]
-            except (KeyError, ValueError) as e:
-                self.logger.warning("[{}] {}".format(player_id, str(e)))
-                update.message.reply_text("Wrong achievement number.")
-                return
-
-            if value not in user_achievements:
-                medal = question
-                text = "\[You don't have this achievement just yet\.\.\.\]"
-            message = "*{} {} {}*\n_{}_".format(medal, title, medal, text)
-            update.message.reply_text(message, parse_mode="MarkdownV2")
-        else:
-            things = [
-                "{:02X}: {}".format(id, medal if id in user_achievements else question)
-                for id, (medal, _, _) in sorted(ACHIEVEMENTS.items())
+        reply_markup = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("Catalog View", callback_data=str(STATE_CATALOG)),
+                ]
             ]
-            things = [things[i : i + 5] for i in range(0, len(things), 5)]
-            message = "*🌟 Achievements 🌟*\n\n"
-            message += "\n".join([", ".join(text) for text in things])
-            message += "\n\nUse `/achievement number` to have more information\."
+        )
 
-            update.message.reply_text(message, parse_mode="MarkdownV2")
+        update.message.reply_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
+
         self.logger.info("[{}] {} requested achievements".format(player_id, update.effective_user.first_name))
+
+        return STATE_ACHIEVEMENTS
+
+    def achievements_again(self, update: Update, context: CallbackContext) -> int:
+        player_id = update.effective_user.id
+
+        user_achievements = self.players_instance.get_achievements(player_id)
+        question = "❔"
+
+        things = [
+            "{:02X}: {}".format(id, medal if id in user_achievements else question)
+            for id, (medal, _, _) in sorted(ACHIEVEMENTS.items())
+        ]
+        things = [things[i : i + 5] for i in range(0, len(things), 5)]
+        message = "*🌟 Achievements 🌟*\n_Unlocked {} achievements out of {}_\n\n".format(
+            len(user_achievements), len(ACHIEVEMENTS.items())
+        )
+        message += "\n".join([", ".join(text) for text in things])
+
+        reply_markup = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("Catalog View", callback_data=str(STATE_CATALOG)),
+                ]
+            ]
+        )
+
+        query = update.callback_query
+        query.answer()
+        update.callback_query.edit_message_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
+
+        return STATE_ACHIEVEMENTS
+
+    def achievements_catalog(self, update: Update, context: CallbackContext) -> int:
+        player_id = update.effective_user.id
+        query = update.callback_query
+        query.answer()
+        data = query.data
+
+        user_achievements = self.players_instance.get_achievements(player_id)
+        question = "❔"
+        not_yet = "\[You don't have this achievement just yet\.\.\.\]"
+
+        if data[2:]:
+            page = int(data[2:])
+        else:
+            page = 0
+
+        total_pages = len(ACHIEVEMENTS.items()) // 5
+
+        message = "*🌟 Achievements 🌟*\n_Page {} out of {}_\n\n".format(page + 1, total_pages + 1)
+        for achievement_id, (medal, title, text) in sorted(ACHIEVEMENTS.items())[5 * page : 5 * (page + 1)]:
+            message += "*{} {} {}*\n_{}_\n\n".format(
+                medal if achievement_id in user_achievements else question,
+                title,
+                medal if achievement_id in user_achievements else question,
+                text if achievement_id in user_achievements else not_yet,
+            )
+
+        page_buttons = []
+        if page > 0:
+            page_buttons.append(
+                InlineKeyboardButton("Previous Page", callback_data="{}_{}".format(STATE_CATALOG, page - 1)),
+            )
+        if page < total_pages:
+            page_buttons.append(
+                InlineKeyboardButton("Next Page", callback_data="{}_{}".format(STATE_CATALOG, page + 1)),
+            )
+
+        reply_markup = InlineKeyboardMarkup(
+            [
+                page_buttons,
+                [
+                    InlineKeyboardButton("Global View", callback_data=str(STATE_ACHIEVEMENTS)),
+                ],
+            ]
+        )
+
+        try:
+            query.edit_message_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
+        except BadRequest as e:  # Not edit to be done
+            self.logger.warning("[{}] {}".format(player_id, str(e)))
+            pass
+
+        return STATE_CATALOG
 
 
 STATE_MAIN, STATE_BUY_SELL, STATE_UPGRADES, STATE_TOOLS = range(4)
