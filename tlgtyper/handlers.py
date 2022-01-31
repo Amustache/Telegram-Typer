@@ -317,8 +317,8 @@ class PlayerHandlers(BaseHandlers):
             message += "*{}*\n".format("Messages")
             message += "– {} current {}\.\n".format(get_si(stats["messages"]["quantity"]), "messages")
             message += "– {} {} in total\.\n".format(get_si(stats["messages"]["total"]), "messages")
-            message += "– {} upgrades unlocked\.\n".format(
-                len(self.players_instance.get_upgrades(player_id, "messages"))
+            message += "– {} upgrades unlocked out of {}\.\n".format(
+                len(self.players_instance.get_upgrades(player_id, "messages")), len(UPGRADES["messages"])
             )
             message += "\n"
 
@@ -329,8 +329,8 @@ class PlayerHandlers(BaseHandlers):
                     message += "*{}*\n".format(item.capitalize())
                     message += "– {} current {}\.\n".format(get_si(attrs["quantity"]), item)
                     message += "– {} {} in total\.\n".format(get_si(attrs["total"]), item)
-                    message += "– {} upgrades unlocked\.\n".format(
-                        len(self.players_instance.get_upgrades(player_id, item))
+                    message += "– {} upgrades unlocked out of {}\.\n".format(
+                        len(self.players_instance.get_upgrades(player_id, item)), len(UPGRADES[item])
                     )
                     for currency, quantity in attrs["gain"].items():
                         currency_per_second = (
@@ -346,6 +346,7 @@ class PlayerHandlers(BaseHandlers):
             for currency, quantity in per_second.items():
                 message += "– Getting {} {} per second\.\n".format(get_si(quantity, type="f"), currency)
 
+        message += "\n"
         message += BOT_LINK
 
         update.message.reply_text(message, parse_mode="MarkdownV2")
@@ -804,7 +805,16 @@ class PlayerInterfaceHandlers(BaseHandlers):
                             available_upgrades.append(upgrade_id)
 
             if not some_upgrades:
-                message += "None for the moment\."
+                message += "None for the moment\.\n"
+
+            message += "\nAcquired upgrades:\n"
+            for upgrade_id in current_upgrades:
+                attrs = UPGRADES[item][upgrade_id]
+                message += "*\[{}\] {}*\n" "_{}_\n".format(
+                    upgrade_id,
+                    attrs["title"],
+                    attrs["text"],
+                )
 
             buttons = [
                 InlineKeyboardButton(
