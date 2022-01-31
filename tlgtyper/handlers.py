@@ -82,6 +82,8 @@ class AdminHandlers(BaseHandlers):
             CommandHandler(["cap"], self.be_extra_rich),
             CommandHandler(["notify"], self.notify_all),
             CommandHandler(["total", "total_players"], self.total_players),
+            CommandHandler(["alpha_ended"], self.give_everyone_alpha),
+            CommandHandler(["beta_ended"], self.give_everyone_beta),
         ]
         super().__init__(
             command_handlers=command_handlers,
@@ -133,6 +135,17 @@ class AdminHandlers(BaseHandlers):
             update.message.reply_text(
                 "There are currently {} players.".format(len(list(self.players_instance.Model.select())))
             )
+
+    # Laziness is a hell of a drug
+    def give_everyone_alpha(self, update: Update, context: CallbackContext) -> None:
+        if update.effective_user.id == ADMIN_CHAT:
+            for player in self.players_instance.Model.select():
+                self.players_instance.cache[player.id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["alpha"]["id"])
+
+    def give_everyone_beta(self, update: Update, context: CallbackContext) -> None:
+        if update.effective_user.id == ADMIN_CHAT:
+            for player in self.players_instance.Model.select():
+                self.players_instance.cache[player.id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["beta"]["id"])
 
 
 class PlayerHandlers(BaseHandlers):

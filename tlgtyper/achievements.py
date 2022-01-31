@@ -26,6 +26,12 @@ ACHIEVEMENTS_ID = {
             "title": "A Special Place in my Heart",
             "text": "Took part in the alpha\!",
         },
+        "beta": {
+            "id": 0xFA,
+            "medal": MEDALS[2],
+            "title": "It's working now, right\?\.\.",
+            "text": "Took part in the beta\!",
+        },
         "upgrades": {
             "id": 0xFE,
             "medal": MEDALS[2],
