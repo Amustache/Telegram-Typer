@@ -1,7 +1,7 @@
 """
 Handlers for the bot.
 """
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import datetime
 import os
 import random
@@ -306,6 +306,7 @@ class PlayerHandlers(BaseHandlers):
         message += "– {} upgrades unlocked\.\n".format(len(self.players_instance.get_upgrades(player_id, "messages")))
         message += "\n"
 
+        per_second = defaultdict(int)
         for item, attrs in stats.items():  # e.g., "contacts": {"unlock_at", ...}
             if "unlock_at" in attrs and stats[item]["unlocked"]:
                 message += "*{}*\n".format(item.capitalize())
@@ -313,15 +314,17 @@ class PlayerHandlers(BaseHandlers):
                 message += "– {} {} in total\.\n".format(get_si(attrs["total"]), item)
                 message += "– {} upgrades unlocked\.\n".format(len(self.players_instance.get_upgrades(player_id, item)))
                 for currency, quantity in attrs["gain"].items():
-                    message += "– Add {} {} per second\.\n".format(
-                        get_si(
-                            accumulate_upgrades(item, stats[item]["upgrades"], stats[item]["gain"][currency])
-                            * stats[item]["quantity"],
-                            type="f",
-                        ),
-                        currency,
+                    currency_per_second = (
+                        accumulate_upgrades(item, stats[item]["upgrades"], stats[item]["gain"][currency])
+                        * stats[item]["quantity"]
                     )
+                    per_second[currency] += currency_per_second
+                    message += "– Add {} {} per second\.\n".format(get_si(currency_per_second, type="f"), currency)
                 message += "\n"
+
+        message += "*Total*\n"
+        for currency, quantity in per_second.items():
+            message += "– Getting {} {} per second\.\n".format(get_si(quantity, type="f"), currency)
 
         message += BOT_LINK
 
