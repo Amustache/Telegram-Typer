@@ -8,7 +8,7 @@ from telegram import ChatAction
 from parameters import CAP
 
 
-def get_si(number, type="'", size=3):
+def get_si(number: float, type="s", size=3):
     if type == "s":
         suf = {
             0: "",
@@ -29,7 +29,7 @@ def get_si(number, type="'", size=3):
         while number // 10 ** (exp * size):
             exp += 1
         exp -= 1 if exp else 0
-        return "{:.2f}".format(int(number / 10 ** (exp * size))).rstrip("0").rstrip(".") + "{}".format(
+        return "{:.2f}".format(number / 10 ** (exp * size)).rstrip("0").rstrip(".") + " {}".format(
             suf[min(exp, len(suf) - 1)]
         )
     elif type == "'":

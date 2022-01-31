@@ -177,7 +177,7 @@ class Players:
             self.logger.error(str(e))
             retry_after = int(str(e).split("in ")[1].split(".0")[0])
             self.cache[player_id]["cooldown"]["retry_after"] = retry_after
-        # Time protection
+        # Timeout protection
         except TimedOut as e:
             self.logger.error(str(e))
             context.bot.send_message(
