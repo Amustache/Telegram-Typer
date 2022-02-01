@@ -763,6 +763,15 @@ class PlayerInterfaceHandlers(BaseHandlers):
                         for currency, price in sell_price.items():
                             gain = get_price_for_n(price, stats[item]["quantity"], -1)
                             message += "– {} {}\n".format(get_si(gain), currency)
+                        message += "\n"
+                        message += "📈 Gains per Second \(for one\):\n"
+                        for currency, quantity in attrs["gain"].items():
+                            currency_per_second = (
+                                    accumulate_upgrades(item, stats[item]["upgrades"], stats[item]["gain"][currency])
+                            )
+                            if currency_per_second >= 0.01:
+                                message += "– Add {} {} per second\.\n".format(get_si(currency_per_second, type="f"),
+                                                                           currency)
 
                         # Select
                         ## Buy
