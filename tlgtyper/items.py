@@ -192,7 +192,7 @@ UPGRADES = {
             "effect": lambda x: 2 * x,
         },
         0x25: {
-            "title": "Changing the Profil Pic",
+            "title": "Changing the Profile Pic",
             "text": "Groups are twice as efficient\!",
             "conditions": {"groups": 50},
             "cost": {"messages": 100000},
