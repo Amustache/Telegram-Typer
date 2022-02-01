@@ -20,7 +20,7 @@ SUFFIXES_MEANING = (
     "– 1 E = One trillion\n"
     "– 1 Z = One trilliard\n"
     "– 1 Y = One quadrillion\n"
-    "... And then it gets weird..."
+    "... And then it gets weird...\n"
     "– 1 AA = 10²⁷\n"
     "– 1 AAA = 10¹⁰²\n"
     "– 1 AAAA = 10¹⁸⁰\n"
