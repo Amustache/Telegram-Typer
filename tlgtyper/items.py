@@ -16,7 +16,7 @@ ITEMS = {
         "id": "c",
         "symbol": "📇",
         "unlock_at": {"messages": 10},
-        "base_price": {"messages": 1},
+        "base_price": {"messages": 2},
         "gain": {"messages": 0.02, "contacts": 0},
     },
     "groups": {
