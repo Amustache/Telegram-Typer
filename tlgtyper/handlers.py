@@ -425,7 +425,7 @@ class PlayerAchievementsHandlers(BaseHandlers):
         message = "*🌟 Achievements 🌟*\n_Unlocked {} achievements out of {}_\n\n".format(
             len(user_achievements), len(ACHIEVEMENTS.items())
         )
-        message += "\n".join([", ".join(text) for text in things])
+        message += "\n".join(["`{}`".format(", ".join(text)) for text in things])
 
         reply_markup = InlineKeyboardMarkup(
             [
