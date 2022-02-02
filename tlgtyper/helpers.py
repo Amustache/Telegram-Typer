@@ -57,3 +57,9 @@ def power_10(number: int) -> int:
         return min(10 ** (len(str(int(number))) - 1), min_cap)
     except OverflowError as e:
         return min_cap
+
+
+def sanitize_for_markdown(text: str) -> str:
+    to_escape = ["_", "*", "[", "]", "(", ")", "~", "`", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!"]
+    for char in to_escape:
+        text.replace(char, "\{}".format(char))

@@ -16,7 +16,7 @@ from parameters import CAP, RESALE_PERCENTAGE
 from secret import ADMIN_CHAT, BOT_LINK
 from tlgtyper.achievements import ACHIEVEMENTS, ACHIEVEMENTS_ID, MAX_ACHIEVEMENTS
 from tlgtyper.cooldown import update_cooldown_and_notify
-from tlgtyper.helpers import get_si, power_10
+from tlgtyper.helpers import get_si, power_10, sanitize_for_markdown
 from tlgtyper.items import accumulate_upgrades, get_max_to_buy, get_price_for_n, id_to_item_name, ITEMS, UPGRADES
 from tlgtyper.jobs import remove_job_if_exists, update_job
 from tlgtyper.texts import BLABLA_TEXT, get_quantities, HELP_COMMANDS, SUFFIXES_MEANING
@@ -308,7 +308,7 @@ class PlayerHandlers(BaseHandlers):
 
         stats = self.players_instance.get_stats(player_id)
         message = "*📊 Stats 📊*\n_Stats of {} as of {}\._\n\n".format(
-            update.effective_user.first_name, datetime.now().strftime("%B %d, %Y at %H:%M GMT")
+            sanitize_for_markdown(update.effective_user.first_name), datetime.now().strftime("%B %d, %Y at %H:%M GMT")
         )
 
         user_achievements = self.players_instance.get_achievements(player_id)
