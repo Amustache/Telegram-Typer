@@ -38,9 +38,8 @@ logger = logging.getLogger(__name__)
 logger.addHandler(fh)
 
 # Database
-Players = Players(logger)
-
 DB = SqliteDatabase(DB_PATH)
+Players = Players(logger, DB)
 DB.bind([Players.Model])
 DB.connect()
 DB.create_tables([Players.Model])

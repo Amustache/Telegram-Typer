@@ -900,7 +900,6 @@ class PlayerInterfaceHandlers(BaseHandlers):
 
         # Choice has been made
         else:
-            player, _ = self.players_instance.get_or_create(player_id)
             item = id_to_item_name(data[1])
             current_upgrades = set(self.players_instance.get_upgrades(player_id, item))
 
@@ -909,8 +908,11 @@ class PlayerInterfaceHandlers(BaseHandlers):
                 for currency, quantity in UPGRADES[item][upgrade_id]["cost"].items():
                     self.players_instance.sub_to_item(player_id, quantity, currency)
                 current_upgrades.add(upgrade_id)
+                player, _ = self.players_instance.get_or_create(player_id)
                 exec('player.{}_upgrades = ", ".join([str(num) for num in current_upgrades if num])'.format(item))
                 player.save()
+
+                self.players_instance.update(player_id, context)
 
             stats = self.players_instance.get_stats(player_id)
 

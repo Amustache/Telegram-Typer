@@ -15,8 +15,9 @@ from tlgtyper.texts import get_quantities
 
 
 class Players:
-    def __init__(self, logger):
+    def __init__(self, logger, db):
         self.logger = logger
+        self.db = db
 
     class Model(Model):
         # Self
@@ -89,7 +90,9 @@ class Players:
             exec("player.{} = str(actual + quantity)".format(item))
             exec("player.{}_total = str(actual_total + quantity)".format(item))
 
-        player.save()
+        with self.db.atomic() as transaction:
+            player.save()
+
         return True
 
     def sub_to_item(self, player_id: int, quantity: float, item: str) -> bool:
@@ -161,7 +164,8 @@ class Players:
         #     player.tools = 1
         #     Players.cache[player_id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["tools"]["id"])
 
-        player.save()
+        with self.db.atomic() as transaction:
+            player.save()
 
     def update_pinned_message(
         self, player_id: int, context: CallbackContext
