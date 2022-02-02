@@ -1,3 +1,4 @@
+from telegram.error import Unauthorized
 from telegram.ext import CallbackContext
 
 
@@ -124,4 +125,7 @@ def update_messages_and_contacts_from_job(context: CallbackContext) -> None:
                 ach //= 10
 
     if messages_to_add > 0 or contacts_to_add > 0:
-        players_instance.update(player_id, context)
+        try:
+            players_instance.update(player_id, context)
+        except Unauthorized as e:  # Bot is blocked
+            remove_job_if_exists(str(player_id), context)

@@ -8,7 +8,7 @@ import random
 
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, Update
-from telegram.error import BadRequest, RetryAfter
+from telegram.error import BadRequest, RetryAfter, Unauthorized
 from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler, ConversationHandler, Filters, MessageHandler
 
 
@@ -114,7 +114,9 @@ class AdminHandlers(BaseHandlers):
                 for player in self.players_instance.Model.select():
                     try:
                         context.bot.send_message(player.id, update.message.reply_to_message.text)
-                    except:
+                    except Unauthorized as e:  # Bot is blocked
+                        self.logger.error(str(e))
+                        remove_job_if_exists(str(player.id), context)
                         blocked += 1
                 self.logger.info(
                     "[{}] {} sent a global message to {} people ({} blocked).".format(
