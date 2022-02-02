@@ -417,25 +417,49 @@ class PlayerAchievementsHandlers(BaseHandlers):
         user_achievements = self.players_instance.get_achievements(player_id)
         question = "❔"
 
-        things = [
-            "{:02X}: {}".format(id, medal if id in user_achievements else question)
-            for id, (medal, _, _) in sorted(ACHIEVEMENTS.items())
-        ]
-        things = [things[i : i + 5] for i in range(0, len(things), 5)]
-        message = "*🌟 Achievements 🌟*\n_Unlocked {} achievements out of {}_\n\n".format(
-            len(user_achievements), len(ACHIEVEMENTS.items())
-        )
-        message += "\n".join(["`{}`".format(", ".join(text)) for text in things])
+        if context.args:
+            try:
+                value = int(context.args[0], 16)
+                if value < 0 or value > 0xFF:
+                    raise ValueError("Wrong achievement number: {}.".format(value))
+            except ValueError as e:
+                self.logger.warning("[{}] {}".format(player_id, str(e)))
+                update.message.reply_text("Usage: `/achievement` or `/achievement number`", parse_mode="MarkdownV2")
+                return
 
-        reply_markup = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("Catalog View", callback_data=str(STATE_ACHIEVEMENTS_CATALOG)),
-                ]
+            try:
+                medal, title, text = ACHIEVEMENTS[value]
+            except (KeyError, ValueError) as e:
+                self.logger.warning("[{}] {}".format(player_id, str(e)))
+                update.message.reply_text("Wrong achievement number.")
+                return
+
+            if value not in user_achievements:
+                medal = question
+                text = "\[You don't have this achievement just yet\.\.\.\]"
+            message = "*{} {} {}*\n_{}_".format(medal, title, medal, text)
+            update.message.reply_text(message, parse_mode="MarkdownV2")
+        else:
+            things = [
+                "{:02X}: {}".format(id, medal if id in user_achievements else question)
+                for id, (medal, _, _) in sorted(ACHIEVEMENTS.items())
             ]
-        )
+            things = [things[i : i + 5] for i in range(0, len(things), 5)]
+            message = "*🌟 Achievements 🌟*\n_Unlocked {} achievements out of {}_\n\n".format(
+                len(user_achievements), len(ACHIEVEMENTS.items())
+            )
+            message += "\n".join(["`{}`".format(", ".join(text)) for text in things])
+            message += "\n\nUse `/achievement number` for a specific achievement\."
 
-        update.message.reply_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
+            reply_markup = InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton("Catalog View", callback_data=str(STATE_ACHIEVEMENTS_CATALOG)),
+                    ]
+                ]
+            )
+
+            update.message.reply_text(message, reply_markup=reply_markup, parse_mode="MarkdownV2")
 
         self.logger.info("[{}] {} requested achievements".format(player_id, update.effective_user.first_name))
 
@@ -456,6 +480,7 @@ class PlayerAchievementsHandlers(BaseHandlers):
             len(user_achievements), len(ACHIEVEMENTS.items())
         )
         message += "\n".join([", ".join(text) for text in things])
+        message += "\n\nUse `/achievement number` for a specific achievement\."
 
         reply_markup = InlineKeyboardMarkup(
             [
@@ -766,12 +791,13 @@ class PlayerInterfaceHandlers(BaseHandlers):
                         message += "\n"
                         message += "📈 Gains per Second \(for one\):\n"
                         for currency, quantity in attrs["gain"].items():
-                            currency_per_second = (
-                                    accumulate_upgrades(item, stats[item]["upgrades"], stats[item]["gain"][currency])
+                            currency_per_second = accumulate_upgrades(
+                                item, stats[item]["upgrades"], stats[item]["gain"][currency]
                             )
                             if currency_per_second >= 0.01:
-                                message += "– Add {} {} per second\.\n".format(get_si(currency_per_second, type="f"),
-                                                                           currency)
+                                message += "– Add {} {} per second\.\n".format(
+                                    get_si(currency_per_second, type="f"), currency
+                                )
 
                         # Select
                         ## Buy
