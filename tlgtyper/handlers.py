@@ -238,7 +238,7 @@ class PlayerHandlers(BaseHandlers):
             update.message.reply_text(update.message.text)  # TODO
             if update.message.text == "J'aime les loutres":
                 self.players_instance.cache[player_id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["loutres"]["id"])
-            self.players_instance.cache[player_id]["from_chat"] += 2
+            self.players_instance.cache[player_id]["from_chat"] += 1
             self.players_instance.cache[player_id]["cooldown"]["counter"] += 1
 
             # Quickmode
