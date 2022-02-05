@@ -17,28 +17,28 @@ ITEMS = {
         "symbol": "📇",
         "unlock_at": {"messages": 10},
         "base_price": {"messages": 2},
-        "gain": {"messages": 0.02, "contacts": 0.},
+        "gain": {"messages": 0.02, "contacts": 0.0},
     },
     "groups": {
         "id": "g",
         "symbol": "👥",
         "unlock_at": {"messages": 100, "contacts": 4},
         "base_price": {"messages": 100, "contacts": 4},
-        "gain": {"messages": 0.2, "contacts": 0.0001},
+        "gain": {"messages": 0.2, "contacts": 0.001},
     },
     "channels": {
         "id": "h",
         "symbol": "📰",
         "unlock_at": {"messages": 1000, "contacts": 16},
         "base_price": {"messages": 1000, "contacts": 16},
-        "gain": {"messages": 2., "contacts": 0.001},
+        "gain": {"messages": 2.0, "contacts": 0.01},
     },
     "supergroups": {
         "id": "s",
         "symbol": "👥",
         "unlock_at": {"messages": 10000, "contacts": 256, "groups": 1},
         "base_price": {"messages": 10000, "contacts": 256, "groups": 1},
-        "gain": {"messages": 20., "contacts": 0.01},
+        "gain": {"messages": 20.0, "contacts": 0.1},
     },
 }
 
