@@ -62,4 +62,5 @@ def power_10(number: int) -> int:
 def sanitize_for_markdown(text: str) -> str:
     to_escape = ["_", "*", "[", "]", "(", ")", "~", "`", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!"]
     for char in to_escape:
-        text.replace(char, "\{}".format(char))
+        text = text.replace(char, "\{}".format(char))
+    return text
