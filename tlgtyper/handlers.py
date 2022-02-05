@@ -443,7 +443,7 @@ class PlayerAchievementsHandlers(BaseHandlers):
             update.message.reply_text(message, parse_mode="MarkdownV2")
         else:
             things = [
-                "{:02X}: {}".format(id, medal if id in user_achievements else question)
+                "{:02X}{}".format(id, medal if id in user_achievements else question)
                 for id, (medal, _, _) in sorted(ACHIEVEMENTS.items())
             ]
             things = [things[i : i + 5] for i in range(0, len(things), 5)]
@@ -474,7 +474,7 @@ class PlayerAchievementsHandlers(BaseHandlers):
         question = "❔"
 
         things = [
-            "{:02X}: {}".format(id, medal if id in user_achievements else question)
+            "{:02X}{}".format(id, medal if id in user_achievements else question)
             for id, (medal, _, _) in sorted(ACHIEVEMENTS.items())
         ]
         things = [things[i : i + 5] for i in range(0, len(things), 5)]
