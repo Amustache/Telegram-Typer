@@ -36,7 +36,7 @@ ACHIEVEMENTS_ID = {
             "id": 0xFE,
             "medal": MEDALS[2],
             "title": "And now for a faster pace\.\.\.",
-            "text": "You can now upgrades your items\!",
+            "text": "You can now upgrade your items\!",
         },
         "tools": {
             "id": 0xFD,
