@@ -66,16 +66,6 @@ def update_messages_and_contacts_from_job(context: CallbackContext) -> None:
                 * stats[item]["quantity"]
             )
 
-    try:
-        messages_to_add = int(messages_to_add)
-    except OverflowError as e:
-        messages_to_add = CAP
-
-    try:
-        contacts_to_add = int(contacts_to_add)
-    except OverflowError as e:
-        contacts_to_add = CAP
-
     if messages_to_add > 0:
         players_instance.add_to_item(player_id, TIME_INTERVAL * messages_to_add, "messages")
 
