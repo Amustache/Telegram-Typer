@@ -88,6 +88,9 @@ class Players:
             exec("player.{}_total = str(CAP)".format(item))
         else:
             exec("player.{} = str(actual + quantity)".format(item))
+
+        # Add to total if needed
+        if quantity > 0:
             exec("player.{}_total = str(actual_total + quantity)".format(item))
 
         with self.db.atomic() as transaction:
