@@ -45,7 +45,7 @@ ITEMS = {
 
 def get_price(base_price: int, cur_items: int) -> int:
     try:
-        return int(base_price * FACTOR ** cur_items)
+        return ceil(base_price * FACTOR ** cur_items)
     except OverflowError:
         return CAP
 
@@ -53,7 +53,7 @@ def get_price(base_price: int, cur_items: int) -> int:
 def get_price_for_n(base_price: int, cur_items: int, wanted_items: int) -> int:
     try:
         # See https://en.wikipedia.org/wiki/Geometric_progression#Geometric_series
-        return int(abs(base_price * ((FACTOR ** cur_items) - (FACTOR ** (cur_items + wanted_items))) / (1 - FACTOR)))
+        return ceil(abs(base_price * ((FACTOR ** cur_items) - (FACTOR ** (cur_items + wanted_items))) / (1 - FACTOR)))
     except OverflowError:
         return CAP
 
