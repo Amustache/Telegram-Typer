@@ -13,7 +13,7 @@ from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler, 
 
 
 from parameters import CAP, RESALE_PERCENTAGE
-from secret import ADMIN_CHAT, BOT_LINK
+from secret import ADMIN_CHAT, ALPHA_TESTERS, BETA_TESTERS, BOT_LINK
 from tlgtyper.achievements import ACHIEVEMENTS, ACHIEVEMENTS_ID, MAX_ACHIEVEMENTS
 from tlgtyper.cooldown import update_cooldown_and_notify
 from tlgtyper.helpers import get_si, power_10, sanitize_for_markdown
@@ -187,6 +187,12 @@ class PlayerHandlers(BaseHandlers):
             player.first_name = user.first_name
 
             self.players_instance.cache[player_id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["start"]["id"])
+
+            if player_id in ALPHA_TESTERS:
+                self.players_instance.cache[player_id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["alpha"]["id"])
+
+            if player_id in BETA_TESTERS:
+                self.players_instance.cache[player_id]["achievements"].append(ACHIEVEMENTS_ID["misc"]["alpha"]["id"])
 
             update.message.reply_text("❕ You're ready to play!")
 
