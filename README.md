@@ -1,9 +1,7 @@
 # Telegram Typer
-gershik is the best tester for ever, MVP, best dude ever.
+An incremental game using the Telegram platform.
 
-Also go play the game [@TTyperBot](https://t.me/TTyper)
-
-## About
+Go play the game [@TTyperBot](https://t.me/TTyper).
 
 ## Setup
 ### Prerequisites:
@@ -34,3 +32,21 @@ cf. `handlers.py/AdminHandlers`
 - `/total`, `/total_players` - How many players are currently playing.
 - `/alpha_ended` - Unlock the "A Special Place in my Heart" achievement for all current players.
 - `/beta_ended` - Unlock the "It's working now, right?.." achievement for all current players.
+
+## Wall of fame
+### Transcendent Tester
+![Transcendent Tester](./img/tester_gold.png)
+* gershik
+* cammonte
+
+### Outstanding Tester
+![Outstanding Tester](./img/tester_silver.png)
+* Felix 3
+* Melon
+* Julien
+
+### Remarkable Tester
+![Remarkable Tester](./img/tester_bronze.png)
+* magalí
+* Sgit
+* const
