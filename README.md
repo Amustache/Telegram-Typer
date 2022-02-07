@@ -34,6 +34,8 @@ cf. `handlers.py/AdminHandlers`
 - `/beta_ended` - Unlock the "It's working now, right?.." achievement for all current players.
 
 ## Wall of fame
+If I forgot you send me a DM... c:
+
 ### Transcendent Tester
 ![Transcendent Tester](./img/tester_gold.png)
 * gershik
@@ -50,3 +52,4 @@ cf. `handlers.py/AdminHandlers`
 * magalí
 * Sgit
 * const
+* T'àwq'an | Tim
